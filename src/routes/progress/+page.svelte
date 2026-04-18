@@ -199,11 +199,16 @@
       </div>
 
     {:else if workouts.length === 0}
-      <div class="rounded-md bg-white/5 border border-white/10 p-8 text-center">
-        <p class="text-sm text-white/50">No workouts yet.</p>
-        <p class="mt-2 text-sm">
-          <a href="/import" class="text-white underline hover:text-white/70">Import your first workout</a>
-        </p>
+      <div class="rounded-md bg-white/5 border border-white/10 p-12 text-center space-y-3">
+        <p class="text-2xl">📈</p>
+        <p class="text-sm font-medium text-white/60">No data yet</p>
+        <p class="text-xs text-white/30">Import some workouts to start tracking progress</p>
+        <div class="flex justify-center pt-1">
+          <a href="/import"
+            class="px-3 py-1.5 bg-white text-neutral-950 rounded-md text-sm font-medium hover:bg-white/90 active:bg-white/75">
+            Import workout
+          </a>
+        </div>
       </div>
 
     {:else}
