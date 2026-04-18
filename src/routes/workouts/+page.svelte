@@ -1,35 +1,67 @@
-<svelte:head>
-	<title>Workouts</title>
-</svelte:head>
-
+﻿<!-- src/routes/workouts/+page.svelte -->
 <script lang="ts">
-	const sampleWorkouts = [
-		{ name: 'Push Day', date: '2026-04-10', exercises: 4 },
-		{ name: 'Pull Day', date: '2026-04-12', exercises: 5 },
-		{ name: 'Leg Day', date: '2026-04-14', exercises: 4 }
-	];
+  import { loadWorkouts, deleteWorkout } from '$lib/storage';
+  import type { Workout } from '$lib/storage';
+
+  let workouts = $state<Workout[]>(loadWorkouts());
+
+  function handleDelete(id: string) {
+    deleteWorkout(id);
+    workouts = loadWorkouts();
+  }
 </script>
 
-<div class="min-h-screen bg-neutral-950 text-white">
-	<div class="mx-auto max-w-4xl px-6 py-16">
-		<h1 class="text-3xl font-bold">Workouts</h1>
-		<p class="mt-3 text-white/70">Your saved workouts will show here.</p>
+<div class="max-w-2xl mx-auto p-6 space-y-6">
 
-		<div class="mt-8 space-y-4">
-			{#each sampleWorkouts as workout}
-				<div class="rounded-2xl border border-white/10 bg-white/5 p-5">
-					<div class="flex items-start justify-between gap-4">
-						<div>
-							<h2 class="text-xl font-semibold">{workout.name}</h2>
-							<p class="mt-1 text-white/60">{workout.date}</p>
-						</div>
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold">Workouts</h1>
+    <a href="/import" class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700">
+      + Import workout
+    </a>
+  </div>
 
-						<div class="rounded-full border border-white/10 px-3 py-1 text-sm text-white/70">
-							{workout.exercises} exercises
-						</div>
-					</div>
-				</div>
-			{/each}
-		</div>
-	</div>
+  {#if workouts.length === 0}
+    <div class="rounded-md border border-gray-200 p-8 text-center text-gray-500">
+      <p class="text-sm">No workouts yet.</p>
+      <p class="mt-2 text-sm">
+        <a href="/import" class="text-blue-600 hover:underline">Import your first workout</a>
+      </p>
+    </div>
+
+  {:else}
+    <div class="space-y-4">
+      {#each workouts as workout (workout.id)}
+        <div class="rounded-md border border-gray-200 bg-white shadow-sm">
+
+          <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <div>
+              <p class="font-semibold">{workout.title}</p>
+              <p class="text-xs text-gray-400">{workout.date}</p>
+            </div>
+            <button onclick={() => handleDelete(workout.id)} class="text-xs text-red-400 hover:text-red-600">
+              Delete
+            </button>
+          </div>
+
+          <ul class="divide-y divide-gray-100">
+            {#each workout.exercises as exercise (exercise.raw)}
+              <li class="flex items-center justify-between px-4 py-2 text-sm">
+                <span class="font-medium">{exercise.name}</span>
+                <span class="text-gray-500">
+                  {exercise.sets}x{exercise.reps}
+                  {#if exercise.weight !== null}
+                    · {exercise.weight}{exercise.unit}
+                  {:else}
+                    · bodyweight
+                  {/if}
+                </span>
+              </li>
+            {/each}
+          </ul>
+
+        </div>
+      {/each}
+    </div>
+  {/if}
+
 </div>

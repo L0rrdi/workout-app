@@ -2,29 +2,62 @@
 <script lang="ts">
   import { parseText } from '$lib/parser';
   import type { ParsedExercise, ParseError } from '$lib/parser';
+  import { saveWorkout, generateId } from '$lib/storage';
 
-  // Svelte 5 uses $state() to declare reactive variables
   let rawInput = $state('');
+  let workoutTitle = $state('');
   let exercises = $state<ParsedExercise[]>([]);
   let errors = $state<ParseError[]>([]);
   let hasParsed = $state(false);
+  let savedMessage = $state('');
 
   function handleParse() {
     const result = parseText(rawInput);
     exercises = result.exercises.map((e) => ({ ...e }));
     errors = result.errors;
     hasParsed = true;
+    savedMessage = '';
   }
 
   function handleSave() {
-    console.log('Exercises to save:', exercises);
-    alert('Saved to console (database coming later)');
+    if (exercises.length === 0) return;
+
+    saveWorkout({
+      id: generateId(),
+      title: workoutTitle.trim() || 'Untitled Workout',
+      date: new Date().toISOString().split('T')[0],
+      exercises
+    });
+
+    savedMessage = 'Workout saved!';
+
+    // Reset after saving
+    rawInput = '';
+    workoutTitle = '';
+    exercises = [];
+    errors = [];
+    hasParsed = false;
   }
 </script>
 
 <div class="max-w-2xl mx-auto p-6 space-y-6">
 
   <h1 class="text-2xl font-bold">Import Workout</h1>
+
+  <!-- Workout title -->
+  <div class="space-y-2">
+    <label for="workout-title" class="block text-sm font-medium text-gray-700">
+      Workout title <span class="text-gray-400">(optional)</span>
+    </label>
+    <input
+      id="workout-title"
+      type="text"
+      bind:value={workoutTitle}
+      placeholder="e.g. Push Day"
+      class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm
+             focus:outline-none focus:ring-2 focus:ring-blue-500"
+    />
+  </div>
 
   <!-- Input area -->
   <div class="space-y-2">
@@ -35,8 +68,7 @@
       id="workout-input"
       bind:value={rawInput}
       rows={8}
-      placeholder="Push Day
-Bench Press 3x8 60kg
+      placeholder="Bench Press 3x8 60kg
 Squat 5 x 5 100 kg
 Pull ups 3x10
 Curl 12kg 3x12"
@@ -54,6 +86,13 @@ Curl 12kg 3x12"
   >
     Parse
   </button>
+
+  <!-- Saved confirmation -->
+  {#if savedMessage}
+    <div class="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+      {savedMessage} — <a href="/workouts" class="underline">View workouts</a>
+    </div>
+  {/if}
 
   <!-- Results -->
   {#if hasParsed}
@@ -80,7 +119,6 @@ Curl 12kg 3x12"
         {#each exercises as exercise (exercise.raw)}
           <div class="rounded-md border border-gray-200 p-4 space-y-3 bg-white shadow-sm">
 
-            <!-- Exercise name -->
             <div class="space-y-1">
               <label
                 for="name-{exercise.raw}"
@@ -97,7 +135,6 @@ Curl 12kg 3x12"
               />
             </div>
 
-            <!-- Sets / Reps / Weight -->
             <div class="grid grid-cols-3 gap-3">
 
               <div class="space-y-1">
