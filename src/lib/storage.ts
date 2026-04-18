@@ -1,21 +1,50 @@
 // src/lib/storage.ts
 //
-// Handles saving and loading workouts from localStorage.
-// This is temporary — we'll replace it with a real database later.
-// Keeping it in one place means we only need to change one file when that happens.
+// Handles saving and loading workouts.
+// Uses the API (D1 database) as the primary source.
+// localStorage is kept only as a fallback during development.
 
 import type { ParsedExercise } from '$lib/parser';
 
 export interface Workout {
-  id: string;           // unique ID, generated from the current timestamp
-  title: string;        // e.g. "Push Day"
-  date: string;         // ISO date string e.g. "2026-04-18"
+  id: string;
+  title: string;
+  date: string;
   exercises: ParsedExercise[];
 }
 
+// ── API functions (these talk to the server) ──────────────────────────────────
+
+export async function fetchWorkouts(): Promise<Workout[]> {
+  const res = await fetch('/api/workouts');
+  if (!res.ok) throw new Error('Failed to load workouts');
+  return res.json();
+}
+
+export async function createWorkout(workout: Workout): Promise<void> {
+  const res = await fetch('/api/workouts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(workout)
+  });
+  if (!res.ok) throw new Error('Failed to save workout');
+}
+
+export async function removeWorkout(id: string): Promise<void> {
+  const res = await fetch(`/api/workouts/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete workout');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+export function generateId(): string {
+  return Date.now().toString();
+}
+
+// ── localStorage (kept for now, will remove after DB is confirmed working) ────
+
 const STORAGE_KEY = 'workouts';
 
-/** Load all workouts from localStorage. Returns an empty array if none exist. */
 export function loadWorkouts(): Workout[] {
   if (typeof localStorage === 'undefined') return [];
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -27,21 +56,14 @@ export function loadWorkouts(): Workout[] {
   }
 }
 
-/** Save a new workout. Adds it to the front of the list (newest first). */
 export function saveWorkout(workout: Workout): void {
   const existing = loadWorkouts();
   const updated = [workout, ...existing];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 }
 
-/** Delete a workout by ID. */
 export function deleteWorkout(id: string): void {
   const existing = loadWorkouts();
   const updated = existing.filter((w) => w.id !== id);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-}
-
-/** Generate a simple unique ID from the current timestamp. */
-export function generateId(): string {
-  return Date.now().toString();
 }

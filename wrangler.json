@@ -1,0 +1,11 @@
+{
+  "name": "workout-app",
+  "compatibility_date": "2026-04-18",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workout-app-db",
+      "database_id": "7cafb61a-3dfc-4503-8c5b-87ff3efde85a"
+    }
+  ]
+}

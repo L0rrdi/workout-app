@@ -1,15 +1,31 @@
 <!-- src/routes/workouts/[id]/+page.svelte -->
 <script lang="ts">
-  import { loadWorkouts } from '$lib/storage';
+  import { fetchWorkouts } from '$lib/storage';
+  import type { Workout } from '$lib/storage';
   import { page } from '$app/stores';
 
   const id = $page.params.id;
-  const workouts = loadWorkouts();
-  const workout = workouts.find((w) => w.id === id);
+
+  let workout = $state<Workout | null>(null);
+  let loading = $state(true);
+  let error = $state('');
+
+  async function load() {
+    try {
+      const workouts = await fetchWorkouts();
+      workout = workouts.find((w) => w.id === id) ?? null;
+    } catch {
+      error = 'Could not load workout.';
+    } finally {
+      loading = false;
+    }
+  }
+
+  load();
 </script>
 
 <svelte:head>
-  <title>{workout ? workout.title : 'Workout not found'}</title>
+  <title>{workout ? workout.title : 'Workout'}</title>
 </svelte:head>
 
 <div class="max-w-2xl mx-auto p-6 space-y-6">
@@ -18,7 +34,13 @@
     &larr; Back to workouts
   </a>
 
-  {#if !workout}
+  {#if loading}
+    <p class="text-sm text-gray-500">Loading...</p>
+
+  {:else if error}
+    <p class="text-sm text-red-500">{error}</p>
+
+  {:else if !workout}
     <div class="rounded-md border border-gray-200 p-8 text-center text-gray-500">
       <p class="text-sm">Workout not found.</p>
       <p class="mt-2 text-sm">

@@ -1,14 +1,28 @@
-<!-- src/routes/workouts/+page.svelte -->
+ï»¿<!-- src/routes/workouts/+page.svelte -->
 <script lang="ts">
-  import { loadWorkouts, deleteWorkout } from '$lib/storage';
+  import { fetchWorkouts, removeWorkout } from '$lib/storage';
   import type { Workout } from '$lib/storage';
 
-  let workouts = $state<Workout[]>(loadWorkouts());
+  let workouts = $state<Workout[]>([]);
+  let loading = $state(true);
+  let error = $state('');
 
-  function handleDelete(id: string) {
-    deleteWorkout(id);
-    workouts = loadWorkouts();
+  async function loadWorkouts() {
+    try {
+      workouts = await fetchWorkouts();
+    } catch {
+      error = 'Could not load workouts.';
+    } finally {
+      loading = false;
+    }
   }
+
+  async function handleDelete(id: string) {
+    await removeWorkout(id);
+    await loadWorkouts();
+  }
+
+  loadWorkouts();
 </script>
 
 <div class="max-w-2xl mx-auto p-6 space-y-6">
@@ -20,7 +34,13 @@
     </a>
   </div>
 
-  {#if workouts.length === 0}
+  {#if loading}
+    <p class="text-sm text-gray-500">Loading...</p>
+
+  {:else if error}
+    <p class="text-sm text-red-500">{error}</p>
+
+  {:else if workouts.length === 0}
     <div class="rounded-md border border-gray-200 p-8 text-center text-gray-500">
       <p class="text-sm">No workouts yet.</p>
       <p class="mt-2 text-sm">
@@ -52,9 +72,9 @@
                 <span class="text-gray-500">
                   {exercise.sets}x{exercise.reps}
                   {#if exercise.weight !== null}
-                    · {exercise.weight}{exercise.unit}
+                    ï¿½ {exercise.weight}{exercise.unit}
                   {:else}
-                    · bodyweight
+                    ï¿½ bodyweight
                   {/if}
                 </span>
               </li>
