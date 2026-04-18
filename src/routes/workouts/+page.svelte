@@ -1,4 +1,4 @@
-ï»¿<!-- src/routes/workouts/+page.svelte -->
+<!-- src/routes/workouts/+page.svelte -->
 <script lang="ts">
   import { loadWorkouts, deleteWorkout } from '$lib/storage';
   import type { Workout } from '$lib/storage';
@@ -35,7 +35,9 @@
 
           <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <div>
-              <p class="font-semibold">{workout.title}</p>
+              <a href="/workouts/{workout.id}" class="font-semibold hover:text-blue-600 transition">
+                {workout.title}
+              </a>
               <p class="text-xs text-gray-400">{workout.date}</p>
             </div>
             <button onclick={() => handleDelete(workout.id)} class="text-xs text-red-400 hover:text-red-600">
@@ -50,9 +52,9 @@
                 <span class="text-gray-500">
                   {exercise.sets}x{exercise.reps}
                   {#if exercise.weight !== null}
-                    Â· {exercise.weight}{exercise.unit}
+                    · {exercise.weight}{exercise.unit}
                   {:else}
-                    Â· bodyweight
+                    · bodyweight
                   {/if}
                 </span>
               </li>
