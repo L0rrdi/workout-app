@@ -1,6 +1,4 @@
 // src/lib/auth.ts
-// Helpers for reading and writing sessions from D1
-
 export interface User {
   id: string;
   google_id: string;
@@ -29,12 +27,4 @@ export async function getUser(request: Request, db: D1Database): Promise<User | 
     .first<User>();
 
   return row ?? null;
-}
-
-export function sessionCookie(sessionId: string, maxAgeSecs = 60 * 60 * 24 * 30): string {
-  return `session=${sessionId}; HttpOnly; Path=/; Max-Age=${maxAgeSecs}; SameSite=Lax`;
-}
-
-export function clearSessionCookie(): string {
-  return `session=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`;
 }

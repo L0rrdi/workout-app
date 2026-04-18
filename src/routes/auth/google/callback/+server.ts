@@ -1,10 +1,8 @@
 // src/routes/auth/google/callback/+server.ts
-// Google redirects here after login — we create a session and redirect home
 import { redirect, json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { sessionCookie } from '$lib/auth';
 
-export const GET: RequestHandler = async ({ url, platform }) => {
+export const GET: RequestHandler = async ({ url, platform, cookies }) => {
   const db = platform?.env.DB;
   const clientId = platform?.env.GOOGLE_CLIENT_ID;
   const clientSecret = platform?.env.GOOGLE_CLIENT_SECRET;
@@ -60,13 +58,20 @@ export const GET: RequestHandler = async ({ url, platform }) => {
 
   // Create session (30 days)
   const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').split('.')[0];
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    .toISOString().replace('T', ' ').split('.')[0];
 
   await db.prepare('INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)')
     .bind(sessionId, user.id, expiresAt)
     .run();
 
-  throw redirect(302, '/', {
-    headers: { 'Set-Cookie': sessionCookie(sessionId) }
+  cookies.set('session', sessionId, {
+    httpOnly: true,
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: 'lax',
+    secure: true
   });
+
+  throw redirect(302, '/');
 };
