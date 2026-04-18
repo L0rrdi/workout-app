@@ -7,6 +7,7 @@
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
   let error = $state('');
+  let query = $state('');
 
   async function loadWorkouts() {
     try {
@@ -45,6 +46,15 @@
     const diff = day === 0 ? 6 : day - 1;
     return new Date(d.getTime() - diff * 86400000).toISOString().split('T')[0];
   }
+
+  const filtered = $derived(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return workouts;
+    return workouts.filter(w =>
+      w.title.toLowerCase().includes(q) ||
+      w.exercises.some(e => e.name.toLowerCase().includes(q))
+    );
+  });
 
   const weeklyVolume = $derived(() => {
     const map = new SvelteMap<string, number>();
@@ -123,9 +133,22 @@
         </div>
       {/if}
 
+      <!-- Search -->
+      <input
+        type="search"
+        bind:value={query}
+        placeholder="Search by workout or exercise…"
+        class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+      />
+
       <!-- Workout list -->
+      {#if filtered().length === 0}
+        <div class="rounded-md bg-white/5 border border-white/10 p-8 text-center">
+          <p class="text-sm text-white/40">No workouts match "{query}".</p>
+        </div>
+      {:else}
       <div class="space-y-4">
-        {#each workouts as workout (workout.id)}
+        {#each filtered() as workout (workout.id)}
           {@const vol = workoutVolume(workout)}
           <div class="rounded-md bg-white/5 border border-white/10">
 
@@ -172,6 +195,7 @@
           </div>
         {/each}
       </div>
+      {/if}
     {/if}
 
   </div>

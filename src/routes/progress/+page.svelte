@@ -77,6 +77,10 @@
     return null;
   }
 
+  const totalSets = $derived(() =>
+    chartData().reduce((sum, s) => sum + s.sets, 0)
+  );
+
   const chartData = $derived(() => {
     if (!selectedExercise) return [];
     const start = periodStart(selectedPeriod);
@@ -266,6 +270,7 @@
               </button>
             {/each}
           </div>
+          <p class="text-xs text-white/40"><span class="text-white font-semibold">{totalSets()}</span> total sets</p>
 
           <!-- Chart -->
           {#if chartData().length === 0}
