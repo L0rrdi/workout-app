@@ -79,7 +79,7 @@ Curl 12kg 3x12"
 
   {#if savedMessage}
     <div class="rounded-md bg-green-50 border border-green-200 p-3 text-sm text-green-700">
-      {savedMessage} — <a href="/workouts" class="underline">View workouts</a>
+      {savedMessage} â€” <a href="/workouts" class="underline">View workouts</a>
     </div>
   {/if}
 
@@ -91,7 +91,7 @@ Curl 12kg 3x12"
           Could not parse {errors.length} line{errors.length > 1 ? 's' : ''}:
         </p>
         {#each errors as err (err.line)}
-          <p class="text-sm text-red-600 font-mono">"{err.line}" — {err.reason}</p>
+          <p class="text-sm text-red-600 font-mono">"{err.line}" â€” {err.reason}</p>
         {/each}
       </div>
     {/if}
@@ -130,7 +130,7 @@ Curl 12kg 3x12"
                 <label for="weight-{exercise.raw}" class="block text-xs font-medium text-gray-500 uppercase tracking-wide">
                   Weight ({exercise.unit ?? 'bodyweight'})
                 </label>
-                <input id="weight-{exercise.raw}" type="number" bind:value={exercise.weight} min="0" step="0.5" placeholder="—" disabled={exercise.weight === null} class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400" />
+                <input id="weight-{exercise.raw}" type="number" bind:value={exercise.weight} min="0" step="0.5" placeholder="â€”" disabled={exercise.weight === null} class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400" />
               </div>
             </div>
 
@@ -148,7 +148,7 @@ Curl 12kg 3x12"
     {/if}
 
     {#if exercises.length === 0 && errors.length === 0}
-      <p class="text-sm text-gray-500">Nothing to show — try pasting some exercises.</p>
+      <p class="text-sm text-gray-500">Nothing to show â€” try pasting some exercises.</p>
     {/if}
 
   {/if}

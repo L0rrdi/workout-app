@@ -1,6 +1,11 @@
 {
   "name": "workout-app",
   "compatibility_date": "2026-04-18",
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "assets": {
+    "directory": ".svelte-kit/cloudflare",
+    "binding": "ASSETS"
+  },
   "d1_databases": [
     {
       "binding": "DB",
