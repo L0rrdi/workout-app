@@ -67,6 +67,9 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
 
   if (!user) throw redirect(302, '/login?error=1');
 
+  // Clean up expired sessions globally on each login
+  await db.prepare(`DELETE FROM sessions WHERE expires_at < datetime('now')`).run();
+
   // Create session (30 days)
   const sessionId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
