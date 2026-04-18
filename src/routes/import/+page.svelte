@@ -1,93 +1,181 @@
+<!-- src/routes/import/+page.svelte -->
 <script lang="ts">
-	import { parseWorkoutText, type ParsedWorkout } from '$lib/server/import/parser';
+  import { parseText } from '$lib/parser';
+  import type { ParsedExercise, ParseError } from '$lib/parser';
 
-	let workoutText = `Push Day
-Bench Press 3x8 60kg
-Incline Dumbbell Press 3x10 22.5kg
-Lateral Raise 4x15 10kg
-Tricep Pushdown 3x12 30kg`;
+  // Svelte 5 uses $state() to declare reactive variables
+  let rawInput = $state('');
+  let exercises = $state<ParsedExercise[]>([]);
+  let errors = $state<ParseError[]>([]);
+  let hasParsed = $state(false);
 
-	let parsedWorkout: ParsedWorkout | null = null;
+  function handleParse() {
+    const result = parseText(rawInput);
+    exercises = result.exercises.map((e) => ({ ...e }));
+    errors = result.errors;
+    hasParsed = true;
+  }
 
-	function handleParse() {
-		parsedWorkout = parseWorkoutText(workoutText);
-	}
+  function handleSave() {
+    console.log('Exercises to save:', exercises);
+    alert('Saved to console (database coming later)');
+  }
 </script>
 
-<svelte:head>
-	<title>Import Workout Text</title>
-</svelte:head>
+<div class="max-w-2xl mx-auto p-6 space-y-6">
 
-<div class="min-h-screen bg-neutral-950 text-white">
-	<div class="mx-auto max-w-5xl px-6 py-16">
-		<h1 class="text-3xl font-bold">Import workout text</h1>
-		<p class="mt-3 text-white/70">
-			Paste workout notes here and preview the structured workout data.
-		</p>
+  <h1 class="text-2xl font-bold">Import Workout</h1>
 
-		<div class="mt-8 grid gap-8 lg:grid-cols-2">
-			<div>
-				<label for="workoutText" class="mb-3 block text-sm font-medium text-white/80">
-					Workout text
-				</label>
+  <!-- Input area -->
+  <div class="space-y-2">
+    <label for="workout-input" class="block text-sm font-medium text-gray-700">
+      Paste your workout text
+    </label>
+    <textarea
+      id="workout-input"
+      bind:value={rawInput}
+      rows={8}
+      placeholder="Push Day
+Bench Press 3x8 60kg
+Squat 5 x 5 100 kg
+Pull ups 3x10
+Curl 12kg 3x12"
+      class="w-full rounded-md border border-gray-300 p-3 font-mono text-sm
+             focus:outline-none focus:ring-2 focus:ring-blue-500"
+    ></textarea>
+  </div>
 
-				<textarea
-					id="workoutText"
-					bind:value={workoutText}
-					class="min-h-[320px] w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white outline-none"
-				/>
+  <!-- Parse button -->
+  <button
+    onclick={handleParse}
+    disabled={rawInput.trim().length === 0}
+    class="px-4 py-2 bg-blue-600 text-white rounded-md font-medium
+           hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
+  >
+    Parse
+  </button>
 
-				<button
-					on:click={handleParse}
-					class="mt-4 rounded-xl bg-white px-5 py-3 font-medium text-black transition hover:opacity-90"
-				>
-					Parse workout text
-				</button>
-			</div>
+  <!-- Results -->
+  {#if hasParsed}
 
-			<div class="rounded-2xl border border-white/10 bg-white/5 p-5">
-				<h2 class="text-xl font-semibold">Parsed preview</h2>
+    <!-- Parse errors -->
+    {#if errors.length > 0}
+      <div class="rounded-md bg-red-50 border border-red-200 p-4 space-y-1">
+        <p class="text-sm font-semibold text-red-700">
+          Could not parse {errors.length} line{errors.length > 1 ? 's' : ''}:
+        </p>
+        {#each errors as err (err.line)}
+          <p class="text-sm text-red-600 font-mono">"{err.line}" — {err.reason}</p>
+        {/each}
+      </div>
+    {/if}
 
-				{#if parsedWorkout}
-					<div class="mt-4">
-						<p class="text-sm uppercase tracking-wide text-white/50">Workout title</p>
-						<h3 class="mt-1 text-2xl font-bold">{parsedWorkout.title}</h3>
-					</div>
+    <!-- Parsed exercises -->
+    {#if exercises.length > 0}
+      <div class="space-y-3">
+        <h2 class="text-lg font-semibold">
+          Parsed {exercises.length} exercise{exercises.length > 1 ? 's' : ''}
+        </h2>
 
-					<div class="mt-6">
-						<p class="text-sm uppercase tracking-wide text-white/50">Exercises</p>
+        {#each exercises as exercise (exercise.raw)}
+          <div class="rounded-md border border-gray-200 p-4 space-y-3 bg-white shadow-sm">
 
-						{#if parsedWorkout.exercises.length > 0}
-							<div class="mt-3 space-y-3">
-								{#each parsedWorkout.exercises as exercise}
-									<div class="rounded-xl border border-white/10 bg-black/20 p-4">
-										<h4 class="text-lg font-semibold">{exercise.name || 'Unnamed exercise'}</h4>
+            <!-- Exercise name -->
+            <div class="space-y-1">
+              <label
+                for="name-{exercise.raw}"
+                class="block text-xs font-medium text-gray-500 uppercase tracking-wide"
+              >
+                Exercise name
+              </label>
+              <input
+                id="name-{exercise.raw}"
+                type="text"
+                bind:value={exercise.name}
+                class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm
+                       focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
 
-										<div class="mt-2 flex flex-wrap gap-2 text-sm text-white/70">
-											<span class="rounded-full border border-white/10 px-3 py-1">
-												Sets: {exercise.sets ?? '-'}
-											</span>
-											<span class="rounded-full border border-white/10 px-3 py-1">
-												Reps: {exercise.reps ?? '-'}
-											</span>
-											<span class="rounded-full border border-white/10 px-3 py-1">
-												Weight: {exercise.weight ?? '-'} {exercise.weight ? exercise.unit : ''}
-											</span>
-										</div>
-									</div>
-								{/each}
-							</div>
-						{:else}
-							<p class="mt-3 text-white/60">No exercises found.</p>
-						{/if}
-					</div>
-				{:else}
-					<p class="mt-4 text-white/60">
-						Click “Parse workout text” to see the structured result here.
-					</p>
-				{/if}
-			</div>
-		</div>
-	</div>
+            <!-- Sets / Reps / Weight -->
+            <div class="grid grid-cols-3 gap-3">
+
+              <div class="space-y-1">
+                <label
+                  for="sets-{exercise.raw}"
+                  class="block text-xs font-medium text-gray-500 uppercase tracking-wide"
+                >
+                  Sets
+                </label>
+                <input
+                  id="sets-{exercise.raw}"
+                  type="number"
+                  bind:value={exercise.sets}
+                  min="1"
+                  class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label
+                  for="reps-{exercise.raw}"
+                  class="block text-xs font-medium text-gray-500 uppercase tracking-wide"
+                >
+                  Reps
+                </label>
+                <input
+                  id="reps-{exercise.raw}"
+                  type="number"
+                  bind:value={exercise.reps}
+                  min="1"
+                  class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div class="space-y-1">
+                <label
+                  for="weight-{exercise.raw}"
+                  class="block text-xs font-medium text-gray-500 uppercase tracking-wide"
+                >
+                  Weight ({exercise.unit ?? 'bodyweight'})
+                </label>
+                <input
+                  id="weight-{exercise.raw}"
+                  type="number"
+                  bind:value={exercise.weight}
+                  min="0"
+                  step="0.5"
+                  placeholder="—"
+                  disabled={exercise.weight === null}
+                  class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm
+                         focus:outline-none focus:ring-2 focus:ring-blue-500
+                         disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+
+            </div>
+          </div>
+        {/each}
+
+        <!-- Save button -->
+        <button
+          onclick={handleSave}
+          class="w-full px-4 py-2 bg-green-600 text-white rounded-md font-medium
+                 hover:bg-green-700"
+        >
+          Save workout
+        </button>
+
+      </div>
+    {/if}
+
+    <!-- Nothing parsed -->
+    {#if exercises.length === 0 && errors.length === 0}
+      <p class="text-sm text-gray-500">Nothing to show — try pasting some exercises.</p>
+    {/if}
+
+  {/if}
+
 </div>
-
