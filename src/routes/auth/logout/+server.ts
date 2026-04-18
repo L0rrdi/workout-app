@@ -10,6 +10,6 @@ export const GET: RequestHandler = async ({ platform, cookies }) => {
     await db.prepare('DELETE FROM sessions WHERE id = ?').bind(sessionId).run();
   }
 
-  cookies.delete('session', { path: '/' });
+  cookies.delete('session', { path: '/', sameSite: 'lax', secure: true });
   throw redirect(302, '/login');
 };

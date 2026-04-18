@@ -36,7 +36,14 @@ export const DELETE: RequestHandler = async ({ params, request, platform }) => {
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = params;
-  await db.prepare('DELETE FROM workouts WHERE id = ? AND user_id = ?').bind(id, user.id).run();
+
+  // Verify ownership before deleting
+  const workout = await db.prepare('SELECT id FROM workouts WHERE id = ? AND user_id = ?')
+    .bind(id, user.id).first<{ id: string }>();
+  if (!workout) return json({ error: 'Not found' }, { status: 404 });
+
+  await db.prepare('DELETE FROM exercises WHERE workout_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM workouts WHERE id = ?').bind(id).run();
 
   return json({ success: true });
 };

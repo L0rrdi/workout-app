@@ -11,12 +11,21 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
     return json({ error: 'Server misconfiguration' }, { status: 500 });
   }
 
+  // Validate state to prevent CSRF
+  const state = url.searchParams.get('state');
+  const storedState = cookies.get('oauth_state');
+  cookies.delete('oauth_state', { path: '/' });
+
+  if (!state || !storedState || state !== storedState) {
+    throw redirect(302, '/login?error=1');
+  }
+
   const code = url.searchParams.get('code');
-  if (!code) throw redirect(302, '/login?error=no_code');
+  if (!code) throw redirect(302, '/login?error=1');
 
   const redirectUri = `${url.origin}/auth/google/callback`;
 
-  // Exchange code for tokens
+  // Exchange code for tokens (10s timeout)
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -26,19 +35,21 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
       client_secret: clientSecret,
       redirect_uri: redirectUri,
       grant_type: 'authorization_code'
-    })
+    }),
+    signal: AbortSignal.timeout(10000)
   });
 
-  if (!tokenRes.ok) throw redirect(302, '/login?error=token_exchange');
+  if (!tokenRes.ok) throw redirect(302, '/login?error=1');
 
   const tokens = await tokenRes.json() as { access_token: string };
 
-  // Get user info from Google
+  // Get user info from Google (10s timeout)
   const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-    headers: { Authorization: `Bearer ${tokens.access_token}` }
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+    signal: AbortSignal.timeout(10000)
   });
 
-  if (!userRes.ok) throw redirect(302, '/login?error=userinfo');
+  if (!userRes.ok) throw redirect(302, '/login?error=1');
 
   const googleUser = await userRes.json() as { id: string; email: string; name: string };
 
@@ -54,7 +65,7 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
     .bind(googleUser.id)
     .first<{ id: string }>();
 
-  if (!user) throw redirect(302, '/login?error=db');
+  if (!user) throw redirect(302, '/login?error=1');
 
   // Create session (30 days)
   const sessionId = crypto.randomUUID();
