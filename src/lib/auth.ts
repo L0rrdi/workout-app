@@ -4,6 +4,8 @@ export interface User {
   google_id: string;
   email: string;
   name: string;
+  picture: string | null;
+  created_at: string;
 }
 
 export function getSessionId(request: Request): string | null {
@@ -18,7 +20,7 @@ export async function getUser(request: Request, db: D1Database): Promise<User | 
 
   const row = await db
     .prepare(`
-      SELECT u.id, u.google_id, u.email, u.name
+      SELECT u.id, u.google_id, u.email, u.name, u.picture, u.created_at
       FROM sessions s
       JOIN users u ON u.id = s.user_id
       WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -28,3 +30,5 @@ export async function getUser(request: Request, db: D1Database): Promise<User | 
 
   return row ?? null;
 }
+
+export const ADMIN_EMAIL = 'nosviland@gmail.com';

@@ -51,15 +51,15 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
 
   if (!userRes.ok) throw redirect(302, '/login?error=1');
 
-  const googleUser = await userRes.json() as { id: string; email: string; name: string };
+  const googleUser = await userRes.json() as { id: string; email: string; name: string; picture: string };
 
   // Upsert user in D1
   const userId = crypto.randomUUID();
   await db.prepare(`
-    INSERT INTO users (id, google_id, email, name)
-    VALUES (?, ?, ?, ?)
-    ON CONFLICT(google_id) DO UPDATE SET email = excluded.email, name = excluded.name
-  `).bind(userId, googleUser.id, googleUser.email, googleUser.name).run();
+    INSERT INTO users (id, google_id, email, name, picture)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(google_id) DO UPDATE SET email = excluded.email, name = excluded.name, picture = excluded.picture
+  `).bind(userId, googleUser.id, googleUser.email, googleUser.name, googleUser.picture ?? null).run();
 
   const user = await db.prepare('SELECT id FROM users WHERE google_id = ?')
     .bind(googleUser.id)

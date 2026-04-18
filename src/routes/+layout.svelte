@@ -44,13 +44,23 @@
 			Import
 		</a>
 		{#if user}
-			<div class="flex items-center gap-3 pl-2 border-l border-white/10">
-				<span class="text-xs text-white/40">{user.name.split(' ')[0]}</span>
+			<div class="pl-2 border-l border-white/10">
 				<a
-					href="/auth/logout"
-					class="text-xs text-white/30 hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded active:text-white/50"
+					href="/profile"
+					class="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
 				>
-					Sign out
+					{#if user.picture}
+						<img
+							src={user.picture}
+							alt={user.name}
+							referrerpolicy="no-referrer"
+							class="w-7 h-7 rounded-full ring-1 ring-white/10 hover:ring-white/30"
+						/>
+					{:else}
+						<div class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60 hover:bg-white/20">
+							{user.name[0]}
+						</div>
+					{/if}
 				</a>
 			</div>
 		{/if}
