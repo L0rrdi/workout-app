@@ -7,17 +7,22 @@ export const GET: RequestHandler = async ({ platform }) => {
   const db = platform?.env.DB;
   if (!db) return json({ error: 'Database not available' }, { status: 500 });
 
-  const workouts = await db.prepare('SELECT * FROM workouts ORDER BY date DESC').all();
+  const [workouts, exercises] = await Promise.all([
+    db.prepare('SELECT * FROM workouts ORDER BY date DESC').all(),
+    db.prepare('SELECT * FROM exercises').all()
+  ]);
 
-  const result = await Promise.all(
-    workouts.results.map(async (workout: Record<string, unknown>) => {
-      const exercises = await db
-        .prepare('SELECT * FROM exercises WHERE workout_id = ?')
-        .bind(workout.id)
-        .all();
-      return { ...workout, exercises: exercises.results };
-    })
-  );
+  const exercisesByWorkout = new Map<string, unknown[]>();
+  for (const e of exercises.results as Record<string, unknown>[]) {
+    const wid = e.workout_id as string;
+    if (!exercisesByWorkout.has(wid)) exercisesByWorkout.set(wid, []);
+    exercisesByWorkout.get(wid)!.push(e);
+  }
+
+  const result = (workouts.results as Record<string, unknown>[]).map(w => ({
+    ...w,
+    exercises: exercisesByWorkout.get(w.id as string) ?? []
+  }));
 
   return json(result);
 };

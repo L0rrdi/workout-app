@@ -30,6 +30,24 @@ export async function createWorkout(workout: Workout): Promise<void> {
   if (!res.ok) throw new Error('Failed to save workout');
 }
 
+export async function bulkCreateWorkouts(workouts: Workout[]): Promise<void> {
+  const res = await fetch('/api/workouts/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(workouts)
+  });
+  if (!res.ok) throw new Error('Failed to bulk import workouts');
+}
+
+export async function updateWorkout(workout: Workout): Promise<void> {
+  const res = await fetch(`/api/workouts/${workout.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(workout)
+  });
+  if (!res.ok) throw new Error('Failed to update workout');
+}
+
 export async function removeWorkout(id: string): Promise<void> {
   const res = await fetch(`/api/workouts/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete workout');
