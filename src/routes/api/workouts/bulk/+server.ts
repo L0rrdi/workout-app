@@ -1,17 +1,21 @@
 // src/routes/api/workouts/bulk/+server.ts
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
+import { getUser } from '$lib/auth';
 
 // POST /api/workouts/bulk — insert multiple workouts at once
 export const POST: RequestHandler = async ({ request, platform }) => {
   const db = platform?.env.DB;
   if (!db) return json({ error: 'Database not available' }, { status: 500 });
 
+  const user = await getUser(request, db);
+  if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
+
   const workouts = await request.json();
 
   for (const workout of workouts) {
-    await db.prepare('INSERT INTO workouts (id, title, date) VALUES (?, ?, ?)')
-      .bind(workout.id, workout.title, workout.date)
+    await db.prepare('INSERT INTO workouts (id, title, date, user_id) VALUES (?, ?, ?, ?)')
+      .bind(workout.id, workout.title, workout.date, user.id)
       .run();
 
     for (let i = 0; i < workout.exercises.length; i++) {
