@@ -1,32 +1,74 @@
 <!-- src/routes/workouts/new/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { createWorkout, generateId } from '$lib/storage';
-  import type { SetRow } from '$lib/storage';
+  import { createWorkout, generateId, fetchWorkouts } from '$lib/storage';
+  import type { SetRow, Workout } from '$lib/storage';
   import type { WeightUnit } from '$lib/parser';
 
   type FormExercise = { _key: number; name: string; unit: string; setRows: SetRow[] };
   type Template = { id: string; title: string; exercises: { name: string; sets: number; reps: number; weight: number | null; unit: string | null }[] };
 
   const today = new Date().toISOString().split('T')[0];
-
-  const TAGS = ['Strength', 'Hypertrophy'];
+  const TAGS = ['Strength', 'Hypertrophy', 'Cardio'];
 
   let title = $state('Workout');
   let date = $state(today);
   let notes = $state('');
   let tag = $state<string | null>(null);
+
+  // Cardio state
+  let cardioActivity = $state('Run');
+  let cardioDistance = $state(0);
+  let cardioMinutes = $state(0);
+  let cardioSeconds = $state(0);
+
+  const cardioPace = $derived(() => {
+    if (cardioDistance <= 0) return null;
+    const total = cardioMinutes * 60 + cardioSeconds;
+    if (total <= 0) return null;
+    const secPerKm = total / cardioDistance;
+    const m = Math.floor(secPerKm / 60);
+    const s = Math.round(secPerKm % 60);
+    return `${m}:${String(s).padStart(2, '0')}/km`;
+  });
+
   let exercises = $state<FormExercise[]>([{ _key: 0, name: '', unit: 'kg', setRows: [{reps: 8, weight: null}, {reps: 8, weight: null}, {reps: 8, weight: null}] }]);
   let nextKey = 1;
   let saving = $state(false);
   let error = $state('');
   let templates = $state<Template[]>([]);
   let showTemplates = $state(false);
+  let allWorkouts = $state<Workout[]>([]);
 
   onMount(async () => {
-    const res = await fetch('/api/templates');
-    if (res.ok) templates = await res.json();
+    const [tRes, workouts] = await Promise.all([
+      fetch('/api/templates'),
+      fetchWorkouts()
+    ]);
+    if (tRes.ok) templates = await tRes.json();
+    allWorkouts = workouts;
   });
+
+  function getLastReps(exerciseName: string, weight: number | null): number | null {
+    const name = exerciseName.trim().toLowerCase();
+    if (!name) return null;
+    const candidates = allWorkouts.filter(w => (w.tag ?? null) === (tag ?? null));
+    for (const w of candidates) {
+      const ex = w.exercises.find(e => e.name.toLowerCase() === name);
+      if (!ex) continue;
+      if (ex.set_data) {
+        try {
+          const rows = JSON.parse(ex.set_data);
+          if (!Array.isArray(rows)) continue;
+          const match = (rows as SetRow[]).find(r => r.weight === weight);
+          if (match !== undefined) return match.reps;
+        } catch { continue; }
+      } else if (ex.weight === weight) {
+        return ex.reps;
+      }
+    }
+    return null;
+  }
 
   function applyTemplate(t: Template) {
     title = t.title;
@@ -72,21 +114,38 @@
     saving = true;
     error = '';
     try {
-      const parsed = exercises
-        .filter(e => e.name.trim())
-        .map(e => {
-          const w = maxWeight(e.setRows);
-          return {
-            name: e.name.trim(),
-            sets: e.setRows.length,
-            reps: e.setRows[0]?.reps ?? 0,
-            weight: w,
-            unit: w !== null ? e.unit as WeightUnit : null,
-            raw: '',
-            set_data: JSON.stringify(e.setRows)
-          };
-        });
-      await createWorkout({ id: generateId(), title: title.trim() || 'Workout', date, notes: notes.trim() || null, tag, exercises: parsed });
+      let parsedExercises;
+      if (tag === 'Cardio') {
+        const totalSec = cardioMinutes * 60 + cardioSeconds;
+        const timeStr = `${cardioMinutes}:${String(cardioSeconds).padStart(2, '0')}`;
+        const pace = cardioPace();
+        parsedExercises = [{
+          name: cardioActivity.trim() || 'Run',
+          sets: 1,
+          reps: 1,
+          weight: null,
+          unit: null,
+          raw: `${cardioDistance}km in ${timeStr}${pace ? ` (${pace} pace)` : ''}`,
+          set_data: JSON.stringify({ cardio: true, distanceKm: cardioDistance, timeSeconds: totalSec })
+        }];
+      } else {
+        parsedExercises = exercises
+          .filter(e => e.name.trim())
+          .map(e => {
+            const w = maxWeight(e.setRows);
+            return {
+              name: e.name.trim(),
+              sets: e.setRows.length,
+              reps: e.setRows[0]?.reps ?? 0,
+              weight: w,
+              unit: w !== null ? e.unit as WeightUnit : null,
+              raw: '',
+              set_data: JSON.stringify(e.setRows)
+            };
+          });
+      }
+      const defaultTitle = tag === 'Cardio' ? 'Cardio' : 'Workout';
+      await createWorkout({ id: generateId(), title: title.trim() || defaultTitle, date, notes: notes.trim() || null, tag, exercises: parsedExercises });
       window.location.href = '/workouts';
     } catch {
       error = 'Could not save workout.';
@@ -109,7 +168,7 @@
 
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-semibold tracking-tight">New Workout</h1>
-      {#if templates.length > 0}
+      {#if templates.length > 0 && tag !== 'Cardio'}
         <button
           onclick={() => showTemplates = !showTemplates}
           class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
@@ -187,92 +246,157 @@
         </div>
       </div>
 
-      <!-- Exercises -->
-      <div class="space-y-3">
-        <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
+      {#if tag === 'Cardio'}
+        <!-- Cardio form -->
+        <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-4">
 
-        {#each exercises as exercise (exercise._key)}
-          <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-3">
+          <!-- Activity -->
+          <div class="space-y-1.5">
+            <label for="cardio-activity" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Activity</label>
+            <input
+              id="cardio-activity" type="text" bind:value={cardioActivity}
+              placeholder="Run"
+              class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+            />
+          </div>
 
-            <!-- Name + unit + remove -->
-            <div class="flex items-start gap-3">
+          <!-- Distance -->
+          <div class="space-y-1.5">
+            <label for="cardio-distance" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Distance (km)</label>
+            <input
+              id="cardio-distance" type="number" min="0" step="0.01"
+              value={cardioDistance || ''}
+              oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); cardioDistance = isNaN(v) ? 0 : v; }}
+              placeholder="5.0"
+              class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+            />
+          </div>
+
+          <!-- Time -->
+          <div class="space-y-1.5">
+            <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Time</p>
+            <div class="flex items-center gap-2">
               <div class="flex-1 space-y-1">
-                <label for="name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Exercise name</label>
+                <label for="cardio-min" class="block text-xs text-white/30">Min</label>
                 <input
-                  id="name-{exercise._key}" type="text" bind:value={exercise.name}
-                  placeholder="e.g. Bench Press"
-                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                  id="cardio-min" type="number" min="0" bind:value={cardioMinutes}
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
                 />
               </div>
-              <div class="space-y-1">
-                <label for="unit-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Unit</label>
-                <select
-                  id="unit-{exercise._key}" bind:value={exercise.unit}
-                  class="rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-                >
-                  <option value="kg" class="bg-neutral-900">kg</option>
-                  <option value="lbs" class="bg-neutral-900">lbs</option>
-                </select>
+              <span class="text-white/30 mt-5">:</span>
+              <div class="flex-1 space-y-1">
+                <label for="cardio-sec" class="block text-xs text-white/30">Sec</label>
+                <input
+                  id="cardio-sec" type="number" min="0" max="59" bind:value={cardioSeconds}
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
               </div>
-              <button
-                onclick={() => removeExercise(exercise._key)}
-                class="mt-5 text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-lg leading-none"
-                aria-label="Remove exercise"
-              >×</button>
             </div>
+          </div>
 
-            <!-- Set rows -->
-            <div class="space-y-2">
-              <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 px-1">
-                <span class="text-xs text-white/30 uppercase tracking-wide"></span>
-                <span class="text-xs font-medium text-white/40 uppercase tracking-wide">Reps</span>
-                <span class="text-xs font-medium text-white/40 uppercase tracking-wide">Weight</span>
-                <span></span>
-              </div>
+          <!-- Pace -->
+          {#if cardioPace()}
+            <div class="pt-1 border-t border-white/5">
+              <p class="text-xs text-white/40 uppercase tracking-wide font-medium">Pace</p>
+              <p class="text-2xl font-semibold mt-1">{cardioPace()}</p>
+            </div>
+          {/if}
 
-              {#each exercise.setRows as row, i (i)}
-                <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] items-center gap-2">
-                  <span class="text-xs text-white/30 text-right tabular-nums">{i + 1}</span>
+        </div>
+
+      {:else}
+        <!-- Exercises -->
+        <div class="space-y-3">
+          <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
+
+          {#each exercises as exercise (exercise._key)}
+            <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-3">
+
+              <!-- Name + unit + remove -->
+              <div class="flex items-start gap-3">
+                <div class="flex-1 space-y-1">
+                  <label for="name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Exercise name</label>
                   <input
-                    type="number" bind:value={row.reps} min="1"
-                    class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-                  />
-                  <input
-                    type="number" min="0" step="0.5" placeholder="—"
-                    value={row.weight ?? ''}
-                    oninput={(e) => {
-                      const v = (e.target as HTMLInputElement).valueAsNumber;
-                      row.weight = isNaN(v) ? null : v;
-                    }}
+                    id="name-{exercise._key}" type="text" bind:value={exercise.name}
+                    placeholder="e.g. Bench Press"
                     class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
                   />
-                  <button
-                    onclick={() => removeSet(exercise, i)}
-                    disabled={exercise.setRows.length === 1}
-                    class="text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none disabled:opacity-0 disabled:cursor-not-allowed text-base leading-none"
-                    aria-label="Remove set"
-                  >×</button>
                 </div>
-              {/each}
+                <div class="space-y-1">
+                  <label for="unit-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Unit</label>
+                  <select
+                    id="unit-{exercise._key}" bind:value={exercise.unit}
+                    class="rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                  >
+                    <option value="kg" class="bg-neutral-900">kg</option>
+                    <option value="lbs" class="bg-neutral-900">lbs</option>
+                  </select>
+                </div>
+                <button
+                  onclick={() => removeExercise(exercise._key)}
+                  class="mt-5 text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-lg leading-none"
+                  aria-label="Remove exercise"
+                >×</button>
+              </div>
 
-              <button
-                onclick={() => addSet(exercise)}
-                class="w-full px-3 py-1.5 rounded bg-white/5 border border-dashed border-white/10 text-xs text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none"
-              >
-                + Add set
-              </button>
+              <!-- Set rows -->
+              <div class="space-y-2">
+                <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 px-1">
+                  <span class="text-xs text-white/30 uppercase tracking-wide"></span>
+                  <span class="text-xs font-medium text-white/40 uppercase tracking-wide">Reps</span>
+                  <span class="text-xs font-medium text-white/40 uppercase tracking-wide">Weight</span>
+                  <span></span>
+                </div>
+
+                {#each exercise.setRows as row, i (i)}
+                  <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] items-center gap-2">
+                    <span class="text-xs text-white/30 text-right tabular-nums">{i + 1}</span>
+                    <div class="space-y-0.5">
+                      <input
+                        type="number" bind:value={row.reps} min="1"
+                        class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                      />
+                      {#if getLastReps(exercise.name, row.weight) !== null}
+                        <p class="text-[10px] text-white/25 pl-1">↩ {getLastReps(exercise.name, row.weight)} last</p>
+                      {/if}
+                    </div>
+                    <input
+                      type="number" min="0" step="0.5" placeholder="—"
+                      value={row.weight ?? ''}
+                      oninput={(e) => {
+                        const v = (e.target as HTMLInputElement).valueAsNumber;
+                        row.weight = isNaN(v) ? null : v;
+                      }}
+                      class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <button
+                      onclick={() => removeSet(exercise, i)}
+                      disabled={exercise.setRows.length === 1}
+                      class="text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none disabled:opacity-0 disabled:cursor-not-allowed text-base leading-none"
+                      aria-label="Remove set"
+                    >×</button>
+                  </div>
+                {/each}
+
+                <button
+                  onclick={() => addSet(exercise)}
+                  class="w-full px-3 py-1.5 rounded bg-white/5 border border-dashed border-white/10 text-xs text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none"
+                >
+                  + Add set
+                </button>
+              </div>
+
             </div>
+          {/each}
 
-          </div>
-        {/each}
-
-        <button
-          onclick={addExercise}
-          class="w-full px-4 py-2.5 rounded-md bg-white/5 border border-dashed border-white/10 text-sm text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
-        >
-          + Add exercise
-        </button>
-      </div>
+          <button
+            onclick={addExercise}
+            class="w-full px-4 py-2.5 rounded-md bg-white/5 border border-dashed border-white/10 text-sm text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+          >
+            + Add exercise
+          </button>
+        </div>
+      {/if}
 
       {#if error}
         <p class="text-sm text-red-400">{error}</p>
