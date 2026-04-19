@@ -2,7 +2,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { fetchWorkouts } from '$lib/storage';
-  import type { Workout } from '$lib/storage';
+  import type { Workout, SetRow } from '$lib/storage';
   import {
     Chart,
     LineController,
@@ -18,6 +18,7 @@
 
   type Period = 'all' | 'year' | 'month' | 'week' | 'day';
   type DayType = 'all' | 'push' | 'pull' | 'legs' | 'other';
+  type Metric = 'weight' | 'reps';
 
   const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const fmtShort = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -27,6 +28,7 @@
   let selectedExercise = $state('');
   let selectedPeriod = $state<Period>('all');
   let selectedDay = $state<DayType>('all');
+  let selectedMetric = $state<Metric>('weight');
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let chart: Chart | null = null;
 
@@ -77,6 +79,23 @@
     return null;
   }
 
+  function getMaxReps(e: { reps: number; set_data?: string | null }): number {
+    if (e.set_data) {
+      const rows = JSON.parse(e.set_data) as SetRow[];
+      return Math.max(...rows.map(r => r.reps));
+    }
+    return e.reps;
+  }
+
+  function getMaxWeight(e: { weight: number | null; set_data?: string | null }): number | null {
+    if (e.set_data) {
+      const rows = JSON.parse(e.set_data) as SetRow[];
+      const weights = rows.map(r => r.weight).filter(w => w !== null) as number[];
+      return weights.length > 0 ? Math.max(...weights) : null;
+    }
+    return e.weight;
+  }
+
   const totalSets = $derived(() =>
     chartData().reduce((sum, s) => sum + s.sets, 0)
   );
@@ -84,19 +103,28 @@
   const chartData = $derived(() => {
     if (!selectedExercise) return [];
     const start = periodStart(selectedPeriod);
-    const byDate = new Map<string, { date: string; workoutId: string; maxWeight: number; sets: number; reps: number; unit: string | null }>();
+    const byDate = new Map<string, { date: string; workoutId: string; maxWeight: number | null; maxReps: number; sets: number; unit: string | null }>();
     filteredWorkouts
       .filter(w => !start || new Date(w.date + 'T00:00:00') >= start)
       .forEach(w => {
-        const matches = w.exercises.filter(
-          e => e.name.toLowerCase() === selectedExercise.toLowerCase() && e.weight !== null
-        );
+        const matches = w.exercises.filter(e => e.name.toLowerCase() === selectedExercise.toLowerCase());
         if (matches.length === 0) return;
-        const maxWeight = Math.max(...matches.map(e => e.weight as number));
-        const best = matches.find(e => e.weight === maxWeight)!;
+        const best = matches.reduce((a, b) => {
+          if (selectedMetric === 'weight') {
+            const aw = getMaxWeight(a) ?? -1;
+            const bw = getMaxWeight(b) ?? -1;
+            return bw > aw ? b : a;
+          } else {
+            return getMaxReps(b) > getMaxReps(a) ? b : a;
+          }
+        });
+        const maxWeight = getMaxWeight(best);
+        const maxReps = getMaxReps(best);
         const existing = byDate.get(w.date);
-        if (!existing || maxWeight > existing.maxWeight) {
-          byDate.set(w.date, { date: w.date, workoutId: w.id, maxWeight, sets: best.sets, reps: best.reps, unit: best.unit });
+        const betterThanExisting = !existing ||
+          (selectedMetric === 'weight' ? (maxWeight ?? -1) > (existing.maxWeight ?? -1) : maxReps > existing.maxReps);
+        if (betterThanExisting) {
+          byDate.set(w.date, { date: w.date, workoutId: w.id, maxWeight, maxReps, sets: best.sets, unit: best.unit });
         }
       });
     return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
@@ -109,12 +137,15 @@
     const data = chartData();
     if (data.length === 0) return;
 
+    const isWeight = selectedMetric === 'weight';
+    const yValues = data.map(d => isWeight ? (d.maxWeight ?? 0) : d.maxReps);
+
     chart = new Chart(canvasEl, {
       type: 'line',
       data: {
         labels: data.map(d => fmtShort(d.date)),
         datasets: [{
-          data: data.map(d => d.maxWeight),
+          data: yValues,
           borderColor: 'rgba(255,255,255,0.9)',
           backgroundColor: 'rgba(255,255,255,0.05)',
           pointBackgroundColor: 'rgba(255,255,255,0.9)',
@@ -147,13 +178,12 @@
             bodyColor: 'rgba(255,255,255,0.5)',
             padding: 10,
             callbacks: {
-              title: (items) => {
-                const d = data[items[0].dataIndex];
-                return fmt(d.date);
-              },
+              title: (items) => fmt(data[items[0].dataIndex].date),
               label: (item) => {
                 const d = data[item.dataIndex];
-                return `${d.maxWeight}${d.unit} · ${d.sets}×${d.reps}`;
+                return isWeight
+                  ? `${d.maxWeight}${d.unit}`
+                  : `${d.maxReps} reps`;
               }
             }
           }
@@ -177,6 +207,7 @@
   $effect(() => {
     selectedExercise;
     selectedPeriod;
+    selectedMetric;
     canvasEl;
     buildChart();
   });
@@ -256,6 +287,20 @@
             </select>
           </div>
 
+          <!-- Metric toggle -->
+          <div class="flex gap-1.5">
+            <button
+              onclick={() => selectedMetric = 'weight'}
+              class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                {selectedMetric === 'weight' ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+            >Weight</button>
+            <button
+              onclick={() => selectedMetric = 'reps'}
+              class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                {selectedMetric === 'reps' ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+            >Reps</button>
+          </div>
+
           <!-- Period tabs -->
           <div class="flex gap-1.5">
             {#each periods as p (p.value)}
@@ -293,7 +338,11 @@
                   >
                     <span class="text-white/60">{fmt(session.date)}</span>
                     <span class="text-white font-medium">
-                      {session.sets}×{session.reps} · {session.maxWeight}{session.unit}
+                      {#if selectedMetric === 'weight'}
+                        {session.maxWeight}{session.unit}
+                      {:else}
+                        {session.maxReps} reps
+                      {/if}
                     </span>
                   </a>
                 {/each}
