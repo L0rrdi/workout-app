@@ -6,12 +6,21 @@
 
 import type { ParsedExercise } from '$lib/parser';
 
+export interface SetRow {
+  reps: number;
+  weight: number | null;
+}
+
+export interface ExerciseWithSetData extends ParsedExercise {
+  set_data?: string | null;
+}
+
 export interface Workout {
   id: string;
   title: string;
   date: string;
   notes: string | null;
-  exercises: ParsedExercise[];
+  exercises: ExerciseWithSetData[];
 }
 
 // ── API functions (these talk to the server) ──────────────────────────────────

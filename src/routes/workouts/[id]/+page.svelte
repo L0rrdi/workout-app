@@ -1,8 +1,8 @@
 <!-- src/routes/workouts/[id]/+page.svelte -->
 <script lang="ts">
   import { fetchWorkouts, updateWorkout } from '$lib/storage';
-  import type { Workout } from '$lib/storage';
-  import type { ParsedExercise } from '$lib/parser';
+  import type { Workout, SetRow } from '$lib/storage';
+  import type { WeightUnit } from '$lib/parser';
   import { page } from '$app/state';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -31,14 +31,13 @@
     setTimeout(() => { templateSaved = false; }, 2000);
   }
 
-  type EditExercise = ParsedExercise & { _key: number };
+  type EditExercise = { _key: number; name: string; unit: string; setRows: SetRow[] };
   let editTitle = $state('');
   let editDate = $state('');
   let editNotes = $state('');
   let editExercises = $state<EditExercise[]>([]);
   let nextKey = 0;
 
-  // Map: exercise name → all-time max weight across every workout
   const prMap = $derived(() => {
     const map = new SvelteMap<string, number>();
     for (const w of allWorkouts) {
@@ -54,9 +53,13 @@
 
   const totalVolume = $derived(() => {
     if (!workout) return 0;
-    return workout.exercises.reduce((sum, e) =>
-      e.weight !== null ? sum + e.sets * e.reps * e.weight : sum, 0
-    );
+    return workout.exercises.reduce((sum, e) => {
+      if (e.set_data) {
+        const rows: SetRow[] = JSON.parse(e.set_data);
+        return sum + rows.reduce((s, r) => r.weight !== null ? s + r.reps * r.weight : s, 0);
+      }
+      return e.weight !== null ? sum + e.sets * e.reps * e.weight : sum;
+    }, 0);
   });
 
   async function load() {
@@ -76,7 +79,14 @@
     editTitle = workout.title;
     editDate = workout.date;
     editNotes = workout.notes ?? '';
-    editExercises = workout.exercises.map((e, i) => ({ ...e, _key: i }));
+    editExercises = workout.exercises.map((e, i) => ({
+      _key: i,
+      name: e.name,
+      unit: e.unit ?? 'kg',
+      setRows: e.set_data
+        ? JSON.parse(e.set_data) as SetRow[]
+        : Array.from({ length: e.sets }, () => ({ reps: e.reps, weight: e.weight }))
+    }));
     editing = true;
   }
 
@@ -88,16 +98,42 @@
 
   function addExercise() {
     editExercises = [...editExercises, {
-      name: '', sets: 3, reps: 8, weight: null, unit: 'kg', raw: '', _key: nextKey++
+      _key: nextKey++, name: '', unit: 'kg',
+      setRows: [{ reps: 8, weight: null }, { reps: 8, weight: null }, { reps: 8, weight: null }]
     }];
+  }
+
+  function addSet(ex: EditExercise) {
+    const last = ex.setRows[ex.setRows.length - 1];
+    ex.setRows = [...ex.setRows, { reps: last?.reps ?? 8, weight: last?.weight ?? null }];
+  }
+
+  function removeSet(ex: EditExercise, i: number) {
+    if (ex.setRows.length === 1) return;
+    ex.setRows = ex.setRows.filter((_, idx) => idx !== i);
+  }
+
+  function maxWeight(setRows: SetRow[]): number | null {
+    const weights = setRows.map(s => s.weight).filter(w => w !== null) as number[];
+    return weights.length > 0 ? Math.max(...weights) : null;
   }
 
   async function saveEdit() {
     if (!workout) return;
     saving = true;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const exercises = editExercises.map(({ _key, ...e }) => e);
+      const exercises = editExercises.map(e => {
+        const w = maxWeight(e.setRows);
+        return {
+          name: e.name,
+          sets: e.setRows.length,
+          reps: e.setRows[0]?.reps ?? 0,
+          weight: w,
+          unit: w !== null ? e.unit as WeightUnit : null,
+          raw: '',
+          set_data: JSON.stringify(e.setRows)
+        };
+      });
       await updateWorkout({ ...workout, title: editTitle.trim() || 'Untitled Workout', date: editDate, notes: editNotes.trim() || null, exercises });
       await load();
       editing = false;
@@ -180,38 +216,64 @@
 
         <div class="space-y-3">
           <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
+
           {#each editExercises as exercise (exercise._key)}
             <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-3">
-              <div class="flex items-start justify-between gap-3">
+
+              <!-- Name + unit + remove -->
+              <div class="flex items-start gap-3">
                 <div class="flex-1 space-y-1">
                   <label for="edit-name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Name</label>
                   <input id="edit-name-{exercise._key}" type="text" bind:value={exercise.name}
                     class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
                 </div>
+                <div class="space-y-1">
+                  <label for="edit-unit-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Unit</label>
+                  <select id="edit-unit-{exercise._key}" bind:value={exercise.unit}
+                    class="rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20">
+                    <option value="kg" class="bg-neutral-900">kg</option>
+                    <option value="lbs" class="bg-neutral-900">lbs</option>
+                  </select>
+                </div>
                 <button onclick={() => removeExercise(exercise._key)}
                   class="mt-5 text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-lg leading-none"
                   aria-label="Remove exercise">×</button>
               </div>
-              <div class="grid grid-cols-3 gap-3">
-                <div class="space-y-1">
-                  <label for="edit-sets-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Sets</label>
-                  <input id="edit-sets-{exercise._key}" type="number" bind:value={exercise.sets} min="1"
-                    class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
+
+              <!-- Set rows -->
+              <div class="space-y-2">
+                <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] gap-2 px-1">
+                  <span></span>
+                  <span class="text-xs font-medium text-white/40 uppercase tracking-wide">Reps</span>
+                  <span class="text-xs font-medium text-white/40 uppercase tracking-wide">Weight</span>
+                  <span></span>
                 </div>
-                <div class="space-y-1">
-                  <label for="edit-reps-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Reps</label>
-                  <input id="edit-reps-{exercise._key}" type="number" bind:value={exercise.reps} min="1"
-                    class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
-                </div>
-                <div class="space-y-1">
-                  <label for="edit-weight-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">
-                    Weight ({exercise.unit ?? 'bodyweight'})
-                  </label>
-                  <input id="edit-weight-{exercise._key}" type="number" bind:value={exercise.weight} min="0" step="0.5"
-                    placeholder="—" disabled={exercise.weight === null}
-                    class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-30 disabled:cursor-not-allowed" />
-                </div>
+
+                {#each exercise.setRows as row, i (i)}
+                  <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] items-center gap-2">
+                    <span class="text-xs text-white/30 text-right tabular-nums">{i + 1}</span>
+                    <input type="number" bind:value={row.reps} min="1"
+                      class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
+                    <input type="number" min="0" step="0.5" placeholder="—"
+                      value={row.weight ?? ''}
+                      oninput={(e) => {
+                        const v = (e.target as HTMLInputElement).valueAsNumber;
+                        row.weight = isNaN(v) ? null : v;
+                      }}
+                      class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20" />
+                    <button onclick={() => removeSet(exercise, i)}
+                      disabled={exercise.setRows.length === 1}
+                      class="text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none disabled:opacity-0 disabled:cursor-not-allowed text-base leading-none"
+                      aria-label="Remove set">×</button>
+                  </div>
+                {/each}
+
+                <button onclick={() => addSet(exercise)}
+                  class="w-full px-3 py-1.5 rounded bg-white/5 border border-dashed border-white/10 text-xs text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none">
+                  + Add set
+                </button>
               </div>
+
             </div>
           {/each}
 
@@ -271,21 +333,27 @@
         <ul class="divide-y divide-white/5">
           {#each workout.exercises as exercise, i (i)}
             {@const isPR = exercise.weight !== null && exercise.weight === prMap().get(exercise.name)}
-            <li class="px-4 py-3 space-y-0.5">
+            <li class="px-4 py-3 space-y-1">
               <div class="flex items-center gap-2">
                 <p class="font-medium text-white">{exercise.name}</p>
                 {#if isPR}
                   <span class="px-1.5 py-0.5 rounded text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/25">PR</span>
                 {/if}
               </div>
-              <p class="text-sm text-white/40">
-                {exercise.sets} sets × {exercise.reps} reps
-                {#if exercise.weight !== null}
-                  · {exercise.weight}{exercise.unit}
-                {:else}
-                  · bodyweight
-                {/if}
-              </p>
+              {#if exercise.set_data}
+                {@const rows = JSON.parse(exercise.set_data) as SetRow[]}
+                <div class="space-y-0.5">
+                  {#each rows as row, si (si)}
+                    <p class="text-sm text-white/40">
+                      Set {si + 1}: {row.reps} reps{row.weight !== null ? ` @ ${row.weight}${exercise.unit}` : ' · bodyweight'}
+                    </p>
+                  {/each}
+                </div>
+              {:else}
+                <p class="text-sm text-white/40">
+                  {exercise.sets} sets × {exercise.reps} reps{exercise.weight !== null ? ` · ${exercise.weight}${exercise.unit}` : ' · bodyweight'}
+                </p>
+              {/if}
             </li>
           {/each}
         </ul>

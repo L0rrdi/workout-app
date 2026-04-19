@@ -48,8 +48,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
   for (const exercise of exercises) {
     await db
-      .prepare('INSERT INTO exercises (id, workout_id, name, sets, reps, weight, unit, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(crypto.randomUUID(), id, exercise.name, exercise.sets, exercise.reps, exercise.weight, exercise.unit, exercise.raw)
+      .prepare('INSERT INTO exercises (id, workout_id, name, sets, reps, weight, unit, raw, set_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(crypto.randomUUID(), id, exercise.name, exercise.sets, exercise.reps, exercise.weight, exercise.unit, exercise.raw, exercise.set_data ?? null)
       .run();
   }
 

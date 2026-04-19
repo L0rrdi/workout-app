@@ -20,8 +20,8 @@ export const PUT: RequestHandler = async ({ params, request, platform }) => {
   for (const e of exercises) {
     const eid = `${id}_${e.name}_${Date.now()}_${Math.random()}`;
     await db.prepare(
-      'INSERT INTO exercises (id, workout_id, name, sets, reps, weight, unit, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).bind(eid, id, e.name, e.sets, e.reps, e.weight ?? null, e.unit ?? null, e.raw).run();
+      'INSERT INTO exercises (id, workout_id, name, sets, reps, weight, unit, raw, set_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(eid, id, e.name, e.sets, e.reps, e.weight ?? null, e.unit ?? null, e.raw, e.set_data ?? null).run();
   }
 
   return json({ success: true });
