@@ -31,7 +31,7 @@
     setTimeout(() => { templateSaved = false; }, 2000);
   }
 
-  const TAGS = ['Strength', 'Hypertrophy', 'Cardio', 'Mobility'];
+  const TAGS = ['Strength', 'Hypertrophy'];
 
   type EditExercise = { _key: number; name: string; unit: string; setRows: SetRow[] };
   let editTitle = $state('');

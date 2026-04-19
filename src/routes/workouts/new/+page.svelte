@@ -10,7 +10,7 @@
 
   const today = new Date().toISOString().split('T')[0];
 
-  const TAGS = ['Strength', 'Hypertrophy', 'Cardio', 'Mobility'];
+  const TAGS = ['Strength', 'Hypertrophy'];
 
   let title = $state('Workout');
   let date = $state(today);

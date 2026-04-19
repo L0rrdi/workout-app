@@ -203,12 +203,17 @@
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
               <div>
-                <a
-                  href="/workouts/{workout.id}"
-                  class="font-semibold text-white hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
-                >
-                  {workout.title}
-                </a>
+                <div class="flex items-center gap-2">
+                  <a
+                    href="/workouts/{workout.id}"
+                    class="font-semibold text-white hover:text-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
+                  >
+                    {workout.title}
+                  </a>
+                  {#if workout.tag}
+                    <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-white/10 text-white/50 border border-white/10">{workout.tag}</span>
+                  {/if}
+                </div>
                 <div class="flex items-center gap-2 mt-0.5">
                   <p class="text-xs text-white/30">{relativeDate(workout.date)}</p>
                   {#if vol > 0}
