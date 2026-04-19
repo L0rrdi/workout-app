@@ -33,9 +33,14 @@ export const PUT: RequestHandler = async ({ params, request, platform }) => {
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = params;
+
+  const owns = await db.prepare('SELECT id FROM workouts WHERE id = ? AND user_id = ?')
+    .bind(id, user.id).first();
+  if (!owns) return json({ error: 'Not found' }, { status: 404 });
+
   const { title, date, notes, tag, exercises } = await request.json();
 
-  await db.prepare('UPDATE workouts SET title = ?, date = ?, notes = ?, tag = ? WHERE id = ? AND user_id = ?').bind(title, date, notes ?? null, tag ?? null, id, user.id).run();
+  await db.prepare('UPDATE workouts SET title = ?, date = ?, notes = ?, tag = ? WHERE id = ?').bind(title, date, notes ?? null, tag ?? null, id).run();
   await db.prepare('DELETE FROM exercises WHERE workout_id = ?').bind(id).run();
 
   for (const e of exercises) {

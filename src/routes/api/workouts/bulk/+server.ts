@@ -13,6 +13,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
   const workouts = await request.json();
 
+  if (!Array.isArray(workouts) || workouts.length > 500) {
+    return json({ error: 'Too many workouts (max 500)' }, { status: 400 });
+  }
+
   for (const workout of workouts) {
     await db.prepare('INSERT INTO workouts (id, title, date, tag, user_id) VALUES (?, ?, ?, ?, ?)')
       .bind(workout.id, workout.title, workout.date, workout.tag ?? null, user.id)
