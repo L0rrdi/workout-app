@@ -1,4 +1,4 @@
-# Workout App Handoff (v5)
+# Workout App Handoff (v7)
 ## Who I am
 I am a beginner building my first full-stack web app. I need step-by-step guidance, including exact commands to run in PowerShell.
 
@@ -42,12 +42,14 @@ You MUST NOT:
 - Use `page.params.id` — NOT `$page.params.id`
 - Use `SvelteMap` from `svelte/reactivity` instead of `new Map()` inside `$derived`
 - Avoid `new Date()` mutation inside `$derived` — use timestamp arithmetic or `Intl.DateTimeFormat`
+- `{@const}` must be a direct child of a block tag (`{#if}`, `{#each}`, etc.) — NOT inside a plain `<div>`
 
 ## Important PowerShell rules
 - Folders with brackets like `[id]` must always be quoted: `"src\routes\[id]"`
 - Use `Set-Content` without `-Encoding UTF8` (this version doesn't support it)
 - When pasting long files into VS Code, always Ctrl+A then Delete first
 - If pasting fails, use the `@' ... '@ | Set-Content path` PowerShell method
+- To edit files with tricky whitespace, use Python one-liners: `python -c "content = open(r'path').read(); content = content.replace('old', 'new'); open(r'path', 'w').write(content)"`
 
 ## Deploy issue — locked folder
 If `npm run build` fails with `EPERM .svelte-kit\cloudflare`, run:
@@ -88,7 +90,7 @@ All of the following is complete and working:
 ### Layout server load — `src/routes/+layout.server.ts`
 - Runs on every page load
 - Redirects unauthenticated users to `/login` (except `/login` and `/auth` routes)
-- Passes `user` to layout
+- Passes `user` and `isAdmin` to layout
 
 ### Security
 - `src/hooks.server.ts` — sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` headers
@@ -102,57 +104,95 @@ All of the following is complete and working:
 - Do NOT touch this file unless explicitly asked
 
 ### Storage module — `src/lib/storage.ts`
-- `Workout` interface: `{ id, title, date, notes: string | null, exercises: ParsedExercise[] }`
+- `SetRow` interface: `{ reps: number; weight: number | null }`
+- `ExerciseWithSetData` interface: extends `ParsedExercise` with optional `set_data?: string | null`
+- `Workout` interface: `{ id, title, date, notes: string | null, tag?: string | null, exercises: ExerciseWithSetData[] }`
 - API functions: `fetchWorkouts()`, `createWorkout()`, `updateWorkout()`, `removeWorkout()`, `bulkCreateWorkouts()`
 - `generateId()` helper
 
 ### API endpoints (all support session cookie OR Bearer token auth)
 - `GET /api/workouts` — fetches all workouts for the logged-in user (2 queries, no N+1)
-- `POST /api/workouts` — creates workout with `user_id`, supports `notes` field
-- `PUT /api/workouts/[id]` — updates workout title, date, notes, exercises (checks ownership)
+- `POST /api/workouts` — creates workout with `user_id`, supports `notes`, `tag`, and `set_data` fields
+- `GET /api/workouts/[id]` — fetches a single workout with exercises; admin can access any user's workout
+- `PUT /api/workouts/[id]` — updates workout title, date, notes, tag, exercises, set_data (checks ownership)
 - `DELETE /api/workouts/[id]` — verifies ownership, deletes exercises first, then workout
 - `DELETE /api/workouts` — deletes ALL workouts for the user (used by Settings page)
-- `POST /api/workouts/bulk` — bulk insert with `user_id`
+- `POST /api/workouts/bulk` — bulk insert with `user_id`, supports `tag` and `set_data`
 - `GET /api/templates` — fetch all templates for user
 - `POST /api/templates` — save new template `{ title, exercises }`
 - `DELETE /api/templates?id=xxx` — delete a template
+- `DELETE /api/admin/users/[id]` — admin only: deletes user + all their data
 
 ### Pages
 - `/login` — "Sign in with Google" button, no nav shown
-- `/` — home page. Shows workout count + streak (2+ days). Links to /import and /workouts
+- `/` — home page. Title "Workout tracking". Shows workout count + streak (2+ days). "+ New workout" button → /workouts/new. "View workouts" button → /workouts
 - `/import` — textarea, parse button, editable preview, save to database. Has "Bulk import" link top-right
 - `/import/bulk` — 3-step flow: copy AI prompt → paste JSON → set date range → preview → import
-- `/workouts` — lists all workouts. Day filter (All/Push/Pull/Legs/Other), search by title or exercise, relative dates (Today/Yesterday/N days ago), weekly volume summary, confirm-before-delete. Import + New buttons top-right
-- `/workouts/new` — form-based workout entry: title, date, notes, exercises (name/sets/reps/weight/unit). Templates picker button top-right if templates exist
-- `/workouts/[id]` — detail page. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. "Use as template" button + Edit button
-- `/progress` — Chart.js line graph. Clicking a dot navigates to that workout. Filter by Day type, exercise dropdown, period tabs (All/Year/Month/Week/Day). Total sets counter for selected exercise below period tabs. Recent sessions list
+- `/workouts` — lists all workouts. Tag badge shown next to workout title. Day filter (All/Push/Pull/Legs/Other), search by title or exercise, relative dates (Today/Yesterday/N days ago), weekly volume summary, confirm-before-delete. Import + New buttons top-right
+- `/workouts/new` — form-based workout entry: title, date, notes, tag picker, exercises with per-set reps+weight rows. Shows "X last" hint below each reps/weight input (matches by exercise name+weight, prefers same tag). Templates picker button top-right if templates exist. Cardio form shown when Cardio tag selected
+- `/workouts/[id]` — detail page. Tag badge shown next to date. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. Per-set display if set_data exists. Cardio display (distance/time/pace) for Cardio tag. "Use as template" button + Edit button. Admin can view any user's workout
+- `/progress` — Chart.js line graph. Weight/Reps metric toggle. Clicking a dot navigates to that workout. Filter by Day type, Tag (shown when tagged workouts exist), exercise dropdown, period tabs (All/Year/Month/Week/Day). Total sets counter. Recent sessions list. Reps mode shows reps at heaviest set
 - `/profile` — shows Google avatar, name, email, date joined. Admin badge (red) for nosviland@gmail.com. Sign out button
 - `/records` — personal records page. All-time best weight per exercise, alphabetically sorted, searchable. Each row links to the workout where the PR was set
 - `/settings` — Delete all workouts button with inline confirm prompt
+- `/admin` — admin-only console. Stats (users/workouts/exercises), top exercises chart, full user table with workout counts. Each user row links to drill-down. Accessible via avatar dropdown (Console link, red, admin only)
+- `/admin/users/[id]` — per-user drill-down. Profile card, workout count, join date, full workout list. Delete user button with inline confirm (deletes all user data)
 
 ### Layout & Nav
 - `src/routes/+layout.svelte` — fixed top nav, dark themed. Hidden on /login
-- Nav links: Workouts | Progress | Import | + Add | avatar dropdown
-- Avatar dropdown (hover): Profile | Records | Settings
-- Active nav: Workouts on `/workouts*`, Progress on `/progress*`, Import filled-white on `/import`, + Add filled-white on `/workouts/new`
+- **Desktop**: Workouts | Progress | Import | + New | avatar dropdown
+- **Mobile**: hamburger button (animates to X) → slide-down menu with all links + profile section
+- Avatar dropdown (hover, desktop only): Profile | Records | Settings | Console (admin only, red)
+- Active nav: Workouts on `/workouts*`, Progress on `/progress*`, Import filled-white on `/import`, + New filled-white on `/workouts/new`
 - Page fade-in animation via `.page-fade` class in `layout.css`
+- `html, body { background-color: #0a0a0a }` in `layout.css` — prevents white overscroll on mobile
+
+### Workout tags
+- Tags: `Strength`, `Hypertrophy`, `Cardio` — stored as `tag TEXT` column on `workouts` table
+- Tag picker shown on `/workouts/new` and edit mode of `/workouts/[id]`
+- Tag badge shown on workout list (`/workouts`) and detail page (`/workouts/[id]`)
+- Tag filter row on `/progress` — only visible when at least one tagged workout exists
+- Selecting a tag is optional; workouts can have no tag
+
+### Cardio workouts
+- Triggered by selecting the "Cardio" tag on `/workouts/new` or edit
+- Form shows: Activity name (default "Run"), Distance (km), Time (minutes + seconds)
+- Live pace calculation displayed as `M:SS/km`
+- Stored as a single exercise row: `name = activity`, `set_data = {"cardio":true,"distanceKm":X,"timeSeconds":Y}`
+- Cardio exercises display as `X km · M:SS · P:PP/km` on list and detail pages
+- `totalVolume` skips cardio exercises (weight is null)
+- PR tracking skips cardio exercises (weight is null)
+
+### Last workout reference (on /workouts/new)
+- When typing an exercise name, each set shows faint hints below the inputs:
+  - `X last` below the reps input — reps at matching weight from last workout
+  - `Xkg last` below the weight input — weight at matching set index from last workout
+- Matching: prefers workouts with same tag, falls back to any workout if none found
+- Skips cardio exercises (non-array set_data)
+
+### Per-set exercise data
+- Each exercise can store per-set reps + weight via `set_data TEXT` column (JSON array of `{reps, weight}`)
+- `sets` = number of set rows, `weight` = max weight across sets (used for PR tracking)
+- Old exercises without `set_data` still display correctly using `sets × reps · weight`
+- New workout form and edit mode both show individual set rows with "+ Add set" / remove buttons
 
 ### Workout templates
 - Stored in `templates` table: `(id, user_id, title, exercises JSON, created_at)`
 - "Use as template" button on `/workouts/[id]` — saves current workout's title + exercises as a template
-- On `/workouts/new` — "Templates" button appears if templates exist, shows list with Use + Delete per template
+- On `/workouts/new` — "Templates" button appears if templates exist (hidden when Cardio tag selected), shows list with Use + Delete per template
 - Applying a template fills in the title and exercises instantly
 
 ### Database
 - Cloudflare D1, database name: `workout-app-db`
 - Tables:
-  - `workouts (id, title, date, notes, user_id)`
-  - `exercises (id, workout_id, name, sets, reps, weight, unit, raw)`
+  - `workouts (id, title, date, notes, tag, user_id)`
+  - `exercises (id, workout_id, name, sets, reps, weight, unit, raw, set_data)`
   - `users (id, google_id, email, name, picture, created_at)`
   - `sessions (id, user_id, expires_at)`
   - `api_tokens (id, user_id UNIQUE, token UNIQUE, created_at)`
   - `templates (id, user_id, title, exercises TEXT, created_at)`
-- Migrations: `0001` through `0006` all applied locally and remotely
+- Migrations: `0001` through `0008` all applied locally and remotely
+  - `0008_add_workout_tag.sql` — adds `tag TEXT` to workouts
 
 ### Secrets (Cloudflare Workers env vars)
 - `GOOGLE_CLIENT_ID` — Google OAuth client ID
@@ -175,11 +215,13 @@ All of the following is complete and working:
 - Secondary buttons: `bg-white/5 border border-white/10 text-white/70 hover:bg-white/10`
 - Labels: `text-xs font-medium text-white/40 uppercase tracking-wide`
 - Date inputs: add `scheme-dark` class
+- Tag badge: `bg-white/10 text-white/60 border border-white/10`
 - No `transition-all`, no blue/indigo as primary color
 - Every clickable element needs hover, focus-visible, and active states
 - Empty states: icon + short message + CTA button (see /workouts and /progress for reference)
 - PR badge: `bg-amber-500/15 text-amber-400 border border-amber-500/25`
 - Admin badge: `bg-red-500/20 text-red-400 border border-red-500/30`
+- All pages need `min-h-screen bg-neutral-950 text-white` on the outer wrapper div
 
 ## File structure
 ```
@@ -213,6 +255,17 @@ src/
           +server.ts
       templates/
         +server.ts
+      admin/
+        users/
+          [id]/
+            +server.ts
+    admin/
+      +page.svelte
+      +page.server.ts
+      users/
+        [id]/
+          +page.svelte
+          +page.server.ts
     import/
       +page.svelte
       bulk/
@@ -241,6 +294,8 @@ migrations/
   0004_add_api_tokens.sql
   0005_add_workout_notes.sql
   0006_add_templates.sql
+  0007_add_set_data.sql
+  0008_add_workout_tag.sql
 wrangler.json
 svelte.config.js
 frontend_rules.md
@@ -274,4 +329,4 @@ Always run both — local for dev, remote for production.
 - The assistant goes by the name "Jarvis" in this project
 - Google OAuth consent screen is published (not in testing mode)
 - Any Google account can sign up — no allowlist
-- Existing workouts without user_id are orphaned (pre-auth data)
+- VS Code TS errors after edits may be stale — run `Restart TS Server` from command palette to clear
