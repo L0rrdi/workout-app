@@ -59,7 +59,7 @@
 				class="text-sm font-medium px-3 py-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50
 					{path === '/workouts/new' ? 'bg-white text-neutral-950' : 'bg-white/10 text-white hover:bg-white hover:text-neutral-950 active:bg-white/75'}"
 			>
-				+ Add
+				+ New
 			</a>
 			{#if user}
 				<div class="relative group pl-2 border-l border-white/10">
@@ -112,7 +112,7 @@
 				Import
 			</a>
 			<a href="/workouts/new" class="flex items-center px-3 py-2.5 rounded-md text-sm {path === '/workouts/new' ? 'text-white font-medium bg-white/5' : 'text-white/60 hover:text-white hover:bg-white/5'} active:bg-white/10">
-				+ Add workout
+				+ New
 			</a>
 			{#if user}
 				<div class="my-1 border-t border-white/10"></div>

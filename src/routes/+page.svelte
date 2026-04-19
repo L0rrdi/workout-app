@@ -71,8 +71,8 @@
     {/if}
 
     <div class="mt-10 flex flex-wrap gap-4">
-      <a href="/import" class="rounded-xl bg-white px-5 py-3 font-medium text-black hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
-        Import workout
+      <a href="/workouts/new" class="rounded-xl bg-white px-5 py-3 font-medium text-black hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50">
+        + New workout
       </a>
       <a href="/workouts" class="rounded-xl border border-white/15 px-5 py-3 font-medium text-white hover:bg-white/5 active:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
         View workouts
