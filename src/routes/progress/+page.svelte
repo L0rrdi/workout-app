@@ -28,6 +28,7 @@
   let selectedExercise = $state('');
   let selectedPeriod = $state<Period>('all');
   let selectedDay = $state<DayType>('all');
+  let selectedTag = $state('all');
   let selectedMetric = $state<Metric>('weight');
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let chart: Chart | null = null;
@@ -56,10 +57,14 @@
     return 'other';
   }
 
+  const availableTags = $derived(
+    [...new Set(workouts.map(w => w.tag).filter((t): t is string => !!t))].sort()
+  );
+
   const filteredWorkouts = $derived(
-    selectedDay === 'all'
-      ? workouts
-      : workouts.filter(w => classifyWorkout(w.title) === selectedDay)
+    workouts
+      .filter(w => selectedDay === 'all' || classifyWorkout(w.title) === selectedDay)
+      .filter(w => selectedTag === 'all' || w.tag === selectedTag)
   );
 
   const exerciseNames = $derived(
@@ -262,6 +267,27 @@
             {/each}
           </div>
         </div>
+
+        <!-- Tag filter (only shown if any workouts have a tag) -->
+        {#if availableTags.length > 0}
+          <div class="space-y-1.5">
+            <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Tag</p>
+            <div class="flex gap-1.5 flex-wrap">
+              <button
+                onclick={() => { selectedTag = 'all'; selectedExercise = exerciseNames[0] ?? ''; }}
+                class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                  {selectedTag === 'all' ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+              >All</button>
+              {#each availableTags as t (t)}
+                <button
+                  onclick={() => { selectedTag = t; selectedExercise = exerciseNames[0] ?? ''; }}
+                  class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                    {selectedTag === t ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+                >{t}</button>
+              {/each}
+            </div>
+          </div>
+        {/if}
 
         {#if exerciseNames.length === 0}
           <div class="rounded-md bg-white/5 border border-white/10 p-8 text-center">

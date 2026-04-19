@@ -10,9 +10,12 @@
 
   const today = new Date().toISOString().split('T')[0];
 
+  const TAGS = ['Strength', 'Hypertrophy', 'Cardio', 'Mobility'];
+
   let title = $state('Workout');
   let date = $state(today);
   let notes = $state('');
+  let tag = $state<string | null>(null);
   let exercises = $state<FormExercise[]>([{ _key: 0, name: '', unit: 'kg', setRows: [{reps: 8, weight: null}, {reps: 8, weight: null}, {reps: 8, weight: null}] }]);
   let nextKey = 1;
   let saving = $state(false);
@@ -83,7 +86,7 @@
             set_data: JSON.stringify(e.setRows)
           };
         });
-      await createWorkout({ id: generateId(), title: title.trim() || 'Workout', date, notes: notes.trim() || null, exercises: parsed });
+      await createWorkout({ id: generateId(), title: title.trim() || 'Workout', date, notes: notes.trim() || null, tag, exercises: parsed });
       window.location.href = '/workouts';
     } catch {
       error = 'Could not save workout.';
@@ -166,6 +169,22 @@
           id="notes" bind:value={notes} rows="3" placeholder="How did the session feel?"
           class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none"
         ></textarea>
+      </div>
+
+      <!-- Tag -->
+      <div class="space-y-1.5">
+        <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Tag</p>
+        <div class="flex gap-2 flex-wrap">
+          {#each TAGS as t (t)}
+            <button
+              onclick={() => tag = tag === t ? null : t}
+              class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                {tag === t
+                  ? 'bg-white text-neutral-950'
+                  : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+            >{t}</button>
+          {/each}
+        </div>
       </div>
 
       <!-- Exercises -->

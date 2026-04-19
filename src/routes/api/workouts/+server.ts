@@ -40,10 +40,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
-  const { id, title, date, notes, exercises } = body;
+  const { id, title, date, notes, tag, exercises } = body;
 
-  await db.prepare('INSERT INTO workouts (id, title, date, notes, user_id) VALUES (?, ?, ?, ?, ?)')
-    .bind(id, title, date, notes ?? null, user.id)
+  await db.prepare('INSERT INTO workouts (id, title, date, notes, tag, user_id) VALUES (?, ?, ?, ?, ?, ?)')
+    .bind(id, title, date, notes ?? null, tag ?? null, user.id)
     .run();
 
   for (const exercise of exercises) {

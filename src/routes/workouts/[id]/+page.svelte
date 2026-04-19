@@ -31,10 +31,13 @@
     setTimeout(() => { templateSaved = false; }, 2000);
   }
 
+  const TAGS = ['Strength', 'Hypertrophy', 'Cardio', 'Mobility'];
+
   type EditExercise = { _key: number; name: string; unit: string; setRows: SetRow[] };
   let editTitle = $state('');
   let editDate = $state('');
   let editNotes = $state('');
+  let editTag = $state<string | null>(null);
   let editExercises = $state<EditExercise[]>([]);
   let nextKey = 0;
 
@@ -79,6 +82,7 @@
     editTitle = workout.title;
     editDate = workout.date;
     editNotes = workout.notes ?? '';
+    editTag = workout.tag ?? null;
     editExercises = workout.exercises.map((e, i) => ({
       _key: i,
       name: e.name,
@@ -134,7 +138,7 @@
           set_data: JSON.stringify(e.setRows)
         };
       });
-      await updateWorkout({ ...workout, title: editTitle.trim() || 'Untitled Workout', date: editDate, notes: editNotes.trim() || null, exercises });
+      await updateWorkout({ ...workout, title: editTitle.trim() || 'Untitled Workout', date: editDate, notes: editNotes.trim() || null, tag: editTag, exercises });
       await load();
       editing = false;
     } catch {
@@ -212,6 +216,21 @@
           <label for="edit-notes" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Notes</label>
           <textarea id="edit-notes" bind:value={editNotes} rows="3" placeholder="How did the session feel?"
             class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none"></textarea>
+        </div>
+
+        <div class="space-y-1.5">
+          <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Tag</p>
+          <div class="flex gap-2 flex-wrap">
+            {#each TAGS as t (t)}
+              <button
+                onclick={() => editTag = editTag === t ? null : t}
+                class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                  {editTag === t
+                    ? 'bg-white text-neutral-950'
+                    : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+              >{t}</button>
+            {/each}
+          </div>
         </div>
 
         <div class="space-y-3">
@@ -300,7 +319,12 @@
       <div class="flex items-start justify-between">
         <div class="space-y-1">
           <h1 class="text-2xl font-semibold tracking-tight">{workout.title}</h1>
-          <p class="text-sm text-white/30">{fmt(workout.date)}</p>
+          <div class="flex items-center gap-2">
+            <p class="text-sm text-white/30">{fmt(workout.date)}</p>
+            {#if workout.tag}
+              <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-white/10 text-white/60 border border-white/10">{workout.tag}</span>
+            {/if}
+          </div>
         </div>
         <div class="flex gap-2">
           <button onclick={saveAsTemplate}

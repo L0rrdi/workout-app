@@ -20,6 +20,7 @@ export interface Workout {
   title: string;
   date: string;
   notes: string | null;
+  tag?: string | null;
   exercises: ExerciseWithSetData[];
 }
 
