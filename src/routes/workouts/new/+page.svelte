@@ -1,12 +1,13 @@
 <!-- src/routes/workouts/new/+page.svelte -->
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { createWorkout, generateId, fetchWorkouts } from '$lib/storage';
   import type { SetRow, Workout } from '$lib/storage';
   import type { WeightUnit } from '$lib/parser';
 
   type FormExercise = { _key: number; name: string; unit: string; setRows: SetRow[] };
-  type Template = { id: string; title: string; exercises: { name: string; sets: number; reps: number; weight: number | null; unit: string | null }[] };
+  type TemplateExercise = { name: string; sets: number; reps: number; weight: number | null; unit: string | null };
+  type Template = { id: string; title: string; exercises: TemplateExercise[] };
 
   const today = new Date().toISOString().split('T')[0];
   const TAGS = ['Strength', 'Hypertrophy', 'Cardio'];
@@ -39,14 +40,175 @@
   let templates = $state<Template[]>([]);
   let showTemplates = $state(false);
   let allWorkouts = $state<Workout[]>([]);
+  let hasDraft = $state(false);
+
+  // Draft
+  const DRAFT_KEY = 'workout_draft';
+
+  function saveDraft() {
+    const draft = { title, date, notes, tag, exercises, nextKey, cardioActivity, cardioDistance, cardioMinutes, cardioSeconds };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    hasDraft = true;
+  }
+
+  function loadDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      title = d.title ?? title;
+      date = d.date ?? date;
+      notes = d.notes ?? notes;
+      tag = d.tag ?? null;
+      exercises = d.exercises ?? exercises;
+      nextKey = d.nextKey ?? nextKey;
+      cardioActivity = d.cardioActivity ?? cardioActivity;
+      cardioDistance = d.cardioDistance ?? cardioDistance;
+      cardioMinutes = d.cardioMinutes ?? cardioMinutes;
+      cardioSeconds = d.cardioSeconds ?? cardioSeconds;
+      hasDraft = true;
+    } catch { /* ignore corrupt draft */ }
+  }
+
+  function discardDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    hasDraft = false;
+    title = 'Workout';
+    date = today;
+    notes = '';
+    tag = null;
+    exercises = [{ _key: 0, name: '', unit: 'kg', setRows: [{reps: 8, weight: null}, {reps: 8, weight: null}, {reps: 8, weight: null}] }];
+    nextKey = 1;
+    cardioActivity = 'Run';
+    cardioDistance = 0;
+    cardioMinutes = 0;
+    cardioSeconds = 0;
+  }
+
+  let draftInterval: ReturnType<typeof setInterval>;
+
+  // Drag state
+  let dragSrcIdx = $state<number | null>(null);
+  let dragOverIdx = $state<number | null>(null);
+  let touchSrcIdx: number | null = null;
+
+  function moveDrag(from: number, to: number) {
+    if (from === to) return;
+    const arr = [...exercises];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+    exercises = arr;
+  }
+
+  function onDragStart(i: number, e: DragEvent) {
+    dragSrcIdx = i;
+    e.dataTransfer!.effectAllowed = 'move';
+  }
+
+  function onDragOver(i: number, e: DragEvent) {
+    e.preventDefault();
+    dragOverIdx = i;
+  }
+
+  function onDrop(i: number) {
+    if (dragSrcIdx !== null) moveDrag(dragSrcIdx, i);
+    dragSrcIdx = null;
+    dragOverIdx = null;
+  }
+
+  function onDragEnd() {
+    dragSrcIdx = null;
+    dragOverIdx = null;
+  }
+
+  function onTouchStart(i: number) {
+    touchSrcIdx = i;
+    dragSrcIdx = i;
+  }
+
+  // Template edit state
+  let editingTemplateId = $state<string | null>(null);
+  let editTitle = $state('');
+  let editExercises = $state<TemplateExercise[]>([]);
+
+  function startEditTemplate(t: Template) {
+    editingTemplateId = t.id;
+    editTitle = t.title;
+    editExercises = t.exercises.map(e => ({ ...e }));
+  }
+
+  function cancelEdit() {
+    editingTemplateId = null;
+  }
+
+  async function saveEditTemplate() {
+    if (!editingTemplateId) return;
+    const res = await fetch(`/api/templates?id=${editingTemplateId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: editTitle.trim() || 'Template', exercises: editExercises })
+    });
+    if (res.ok) {
+      templates = templates.map(t =>
+        t.id === editingTemplateId
+          ? { ...t, title: editTitle.trim() || 'Template', exercises: editExercises.map(e => ({ ...e })) }
+          : t
+      );
+      editingTemplateId = null;
+    }
+  }
+
+  function addEditExercise() {
+    editExercises = [...editExercises, { name: '', sets: 3, reps: 8, weight: null, unit: 'kg' }];
+  }
+
+  function removeEditExercise(i: number) {
+    editExercises = editExercises.filter((_, idx) => idx !== i);
+  }
+
+  // Touch handlers stored for cleanup
+  let touchMoveHandler: ((e: TouchEvent) => void) | null = null;
+  let touchEndHandler: (() => void) | null = null;
 
   onMount(async () => {
+    loadDraft();
+    draftInterval = setInterval(saveDraft, 3000);
+
+    touchMoveHandler = (e: TouchEvent) => {
+      if (touchSrcIdx === null) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const card = el?.closest('[data-exidx]') as HTMLElement | null;
+      if (card?.dataset.exidx !== undefined) {
+        dragOverIdx = parseInt(card.dataset.exidx);
+      }
+    };
+
+    touchEndHandler = () => {
+      if (touchSrcIdx !== null && dragOverIdx !== null && touchSrcIdx !== dragOverIdx) {
+        moveDrag(touchSrcIdx, dragOverIdx);
+      }
+      touchSrcIdx = null;
+      dragSrcIdx = null;
+      dragOverIdx = null;
+    };
+
+    document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+    document.addEventListener('touchend', touchEndHandler);
+
     const [tRes, workouts] = await Promise.all([
       fetch('/api/templates'),
       fetchWorkouts()
     ]);
     if (tRes.ok) templates = await tRes.json();
     allWorkouts = workouts;
+  });
+
+  onDestroy(() => {
+    clearInterval(draftInterval);
+    if (touchMoveHandler) document.removeEventListener('touchmove', touchMoveHandler);
+    if (touchEndHandler) document.removeEventListener('touchend', touchEndHandler);
   });
 
   function findLastExercise(exerciseName: string) {
@@ -133,6 +295,14 @@
     return weights.length > 0 ? Math.max(...weights) : null;
   }
 
+  function noExp(e: KeyboardEvent) {
+    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+  }
+
+  function noExpNoDot(e: KeyboardEvent) {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
+  }
+
   async function save() {
     saving = true;
     error = '';
@@ -169,6 +339,7 @@
       }
       const defaultTitle = tag === 'Cardio' ? 'Cardio' : 'Workout';
       await createWorkout({ id: generateId(), title: title.trim() || defaultTitle, date, notes: notes.trim() || null, tag, exercises: parsedExercises });
+      localStorage.removeItem(DRAFT_KEY);
       window.location.href = '/workouts';
     } catch {
       error = 'Could not save workout.';
@@ -190,36 +361,131 @@
     </a>
 
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold tracking-tight">New Workout</h1>
-      {#if templates.length > 0 && tag !== 'Cardio'}
-        <button
-          onclick={() => showTemplates = !showTemplates}
-          class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-        >
-          Templates
-        </button>
-      {/if}
+      <div class="flex items-center gap-3">
+        <h1 class="text-2xl font-semibold tracking-tight">New Workout</h1>
+        {#if hasDraft}
+          <span class="text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/10 text-white/50">Draft</span>
+        {/if}
+      </div>
+      <div class="flex items-center gap-2">
+        {#if hasDraft}
+          <button
+            onclick={discardDraft}
+            class="px-3 py-1.5 text-sm text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
+          >Discard draft</button>
+        {/if}
+        {#if templates.length > 0 && tag !== 'Cardio'}
+          <button
+            onclick={() => showTemplates = !showTemplates}
+            class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+          >
+            Templates
+          </button>
+        {/if}
+      </div>
     </div>
 
     {#if showTemplates}
       <div class="rounded-md bg-white/5 border border-white/10 divide-y divide-white/5">
         {#each templates as t (t.id)}
-          <div class="flex items-center justify-between px-4 py-3">
-            <div>
-              <p class="text-sm font-medium text-white">{t.title}</p>
-              <p class="text-xs text-white/40">{t.exercises.length} exercise{t.exercises.length !== 1 ? 's' : ''}</p>
-            </div>
-            <div class="flex gap-2">
+          {#if editingTemplateId === t.id}
+            <!-- Inline edit form -->
+            <div class="p-4 space-y-3">
+              <input
+                type="text" bind:value={editTitle}
+                placeholder="Template name"
+                class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+              />
+              <div class="space-y-2">
+                {#each editExercises as ex, i (i)}
+                  <div class="grid grid-cols-[1fr_3rem_3rem_4rem_3rem_1.5rem] items-center gap-2">
+                    <input
+                      type="text" bind:value={ex.name}
+                      placeholder="Exercise"
+                      class="rounded bg-white/5 border border-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <input
+                      type="number" inputmode="numeric" bind:value={ex.sets} min="1"
+                      title="Sets"
+                      onkeydown={noExpNoDot}
+                      class="rounded bg-white/5 border border-white/10 px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <input
+                      type="number" inputmode="numeric" bind:value={ex.reps} min="1"
+                      title="Reps"
+                      onkeydown={noExpNoDot}
+                      class="rounded bg-white/5 border border-white/10 px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <input
+                      type="number" inputmode="decimal" min="0" step="0.5"
+                      value={ex.weight ?? ''}
+                      oninput={(e) => { const v = (e.target as HTMLInputElement).valueAsNumber; ex.weight = isNaN(v) ? null : v; }}
+                      title="Weight"
+                      placeholder="—"
+                      onkeydown={noExp}
+                      class="rounded bg-white/5 border border-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/30 text-center focus:outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <select
+                      bind:value={ex.unit}
+                      class="rounded bg-white/5 border border-white/10 px-1 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                    >
+                      <option value="kg" class="bg-neutral-900">kg</option>
+                      <option value="lbs" class="bg-neutral-900">lbs</option>
+                    </select>
+                    <button
+                      onclick={() => removeEditExercise(i)}
+                      class="text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-lg leading-none"
+                      aria-label="Remove"
+                    >×</button>
+                  </div>
+                {/each}
+                <div class="grid grid-cols-[1fr_3rem_3rem_4rem_3rem_1.5rem] gap-2 pt-0.5">
+                  <p class="text-[10px] text-white/30 pl-1">Name</p>
+                  <p class="text-[10px] text-white/30 text-center">Sets</p>
+                  <p class="text-[10px] text-white/30 text-center">Reps</p>
+                  <p class="text-[10px] text-white/30 text-center">Wt</p>
+                  <p class="text-[10px] text-white/30 text-center">Unit</p>
+                  <span></span>
+                </div>
+              </div>
               <button
-                onclick={() => applyTemplate(t)}
-                class="px-3 py-1.5 bg-white text-neutral-950 rounded text-xs font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none"
-              >Use</button>
-              <button
-                onclick={() => deleteTemplate(t.id)}
-                class="px-2 py-1.5 text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-xs rounded"
-              >Delete</button>
+                onclick={addEditExercise}
+                class="w-full px-3 py-1.5 rounded bg-white/5 border border-dashed border-white/10 text-xs text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none"
+              >+ Add exercise</button>
+              <div class="flex gap-2 justify-end pt-1">
+                <button
+                  onclick={cancelEdit}
+                  class="px-3 py-1.5 text-sm text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none rounded"
+                >Cancel</button>
+                <button
+                  onclick={saveEditTemplate}
+                  class="px-3 py-1.5 bg-white text-neutral-950 rounded text-sm font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none"
+                >Save</button>
+              </div>
             </div>
-          </div>
+          {:else}
+            <!-- Normal template row -->
+            <div class="flex items-center justify-between px-4 py-3">
+              <div>
+                <p class="text-sm font-medium text-white">{t.title}</p>
+                <p class="text-xs text-white/40">{t.exercises.length} exercise{t.exercises.length !== 1 ? 's' : ''}</p>
+              </div>
+              <div class="flex gap-2">
+                <button
+                  onclick={() => applyTemplate(t)}
+                  class="px-3 py-1.5 bg-white text-neutral-950 rounded text-xs font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none"
+                >Use</button>
+                <button
+                  onclick={() => startEditTemplate(t)}
+                  class="px-2 py-1.5 text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none text-xs rounded"
+                >Edit</button>
+                <button
+                  onclick={() => deleteTemplate(t.id)}
+                  class="px-2 py-1.5 text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-xs rounded"
+                >Delete</button>
+              </div>
+            </div>
+          {/if}
         {/each}
       </div>
     {/if}
@@ -287,10 +553,11 @@
           <div class="space-y-1.5">
             <label for="cardio-distance" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Distance (km)</label>
             <input
-              id="cardio-distance" type="number" min="0" step="0.01"
+              id="cardio-distance" type="number" inputmode="decimal" min="0" step="0.01"
               value={cardioDistance || ''}
               oninput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); cardioDistance = isNaN(v) ? 0 : v; }}
               placeholder="5.0"
+              onkeydown={noExp}
               class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
             />
           </div>
@@ -302,7 +569,8 @@
               <div class="flex-1 space-y-1">
                 <label for="cardio-min" class="block text-xs text-white/30">Min</label>
                 <input
-                  id="cardio-min" type="number" min="0" bind:value={cardioMinutes}
+                  id="cardio-min" type="number" inputmode="numeric" min="0" bind:value={cardioMinutes}
+                  onkeydown={noExpNoDot}
                   class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
                 />
               </div>
@@ -310,7 +578,8 @@
               <div class="flex-1 space-y-1">
                 <label for="cardio-sec" class="block text-xs text-white/30">Sec</label>
                 <input
-                  id="cardio-sec" type="number" min="0" max="59" bind:value={cardioSeconds}
+                  id="cardio-sec" type="number" inputmode="numeric" min="0" max="59" bind:value={cardioSeconds}
+                  onkeydown={noExpNoDot}
                   class="w-full rounded bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
                 />
               </div>
@@ -332,11 +601,31 @@
         <div class="space-y-3">
           <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
 
-          {#each exercises as exercise (exercise._key)}
-            <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-3">
+          {#each exercises as exercise, exIdx (exercise._key)}
+            <div
+              class="rounded-md border p-4 space-y-3
+                {dragOverIdx === exIdx && dragSrcIdx !== exIdx
+                  ? 'bg-white/8 border-white/30'
+                  : dragSrcIdx === exIdx
+                    ? 'bg-white/3 border-white/10 opacity-50'
+                    : 'bg-white/5 border-white/10'}"
+              role="listitem"
+              draggable="true"
+              data-exidx={exIdx}
+              ondragstart={(e) => onDragStart(exIdx, e)}
+              ondragover={(e) => onDragOver(exIdx, e)}
+              ondrop={() => onDrop(exIdx)}
+              ondragend={onDragEnd}
+            >
 
               <!-- Name + unit + remove -->
-              <div class="flex items-start gap-3">
+              <div class="flex items-start gap-2">
+                <!-- Drag handle -->
+                <button
+                  class="mt-5 cursor-grab active:cursor-grabbing text-white/20 hover:text-white/50 focus-visible:outline-none touch-none select-none"
+                  aria-label="Drag to reorder"
+                  ontouchstart={() => onTouchStart(exIdx)}
+                >⠿</button>
                 <div class="flex-1 space-y-1">
                   <label for="name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Exercise name</label>
                   <input
@@ -376,7 +665,8 @@
                     <span class="text-xs text-white/30 text-right tabular-nums">{i + 1}</span>
                     <div class="space-y-0.5">
                       <input
-                        type="number" bind:value={row.reps} min="1"
+                        type="number" inputmode="numeric" bind:value={row.reps} min="1"
+                        onkeydown={noExpNoDot}
                         class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
                       />
                       {#if getLastReps(exercise.name, row.weight) !== null}
@@ -385,12 +675,13 @@
                     </div>
                     <div class="space-y-0.5">
                       <input
-                        type="number" min="0" step="0.5" placeholder="—"
+                        type="number" inputmode="decimal" min="0" step="0.5" placeholder="—"
                         value={row.weight ?? ''}
                         oninput={(e) => {
                           const v = (e.target as HTMLInputElement).valueAsNumber;
                           row.weight = isNaN(v) ? null : v;
                         }}
+                        onkeydown={noExp}
                         class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
                       />
                       {#if getLastWeightStr(exercise.name, i) !== null}

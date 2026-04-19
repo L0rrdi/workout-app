@@ -1,5 +1,6 @@
 <!-- src/routes/workouts/[id]/+page.svelte -->
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
   import { fetchWorkouts, updateWorkout } from '$lib/storage';
   import type { Workout, SetRow } from '$lib/storage';
   import type { WeightUnit } from '$lib/parser';
@@ -102,6 +103,49 @@
 
   function cancelEdit() { editing = false; }
 
+  // Drag state
+  let dragSrcIdx = $state<number | null>(null);
+  let dragOverIdx = $state<number | null>(null);
+  let touchSrcIdx: number | null = null;
+
+  function moveDrag(from: number, to: number) {
+    if (from === to) return;
+    const arr = [...editExercises];
+    const [item] = arr.splice(from, 1);
+    arr.splice(to, 0, item);
+    editExercises = arr;
+  }
+
+  function onDragStart(i: number, e: DragEvent) { dragSrcIdx = i; e.dataTransfer!.effectAllowed = 'move'; }
+  function onDragOver(i: number, e: DragEvent) { e.preventDefault(); dragOverIdx = i; }
+  function onDrop(i: number) { if (dragSrcIdx !== null) moveDrag(dragSrcIdx, i); dragSrcIdx = null; dragOverIdx = null; }
+  function onDragEnd() { dragSrcIdx = null; dragOverIdx = null; }
+  function onTouchStart(i: number) { touchSrcIdx = i; dragSrcIdx = i; }
+
+  let touchMoveHandler: ((e: TouchEvent) => void) | null = null;
+  let touchEndHandler: (() => void) | null = null;
+
+  onMount(() => {
+    touchMoveHandler = (e: TouchEvent) => {
+      if (touchSrcIdx === null) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const card = (document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null)?.closest('[data-exidx]') as HTMLElement | null;
+      if (card?.dataset.exidx !== undefined) dragOverIdx = parseInt(card.dataset.exidx);
+    };
+    touchEndHandler = () => {
+      if (touchSrcIdx !== null && dragOverIdx !== null && touchSrcIdx !== dragOverIdx) moveDrag(touchSrcIdx, dragOverIdx);
+      touchSrcIdx = null; dragSrcIdx = null; dragOverIdx = null;
+    };
+    document.addEventListener('touchmove', touchMoveHandler, { passive: false });
+    document.addEventListener('touchend', touchEndHandler);
+  });
+
+  onDestroy(() => {
+    if (touchMoveHandler) document.removeEventListener('touchmove', touchMoveHandler);
+    if (touchEndHandler) document.removeEventListener('touchend', touchEndHandler);
+  });
+
   function removeExercise(key: number) {
     editExercises = editExercises.filter(e => e._key !== key);
   }
@@ -152,6 +196,14 @@
     } finally {
       saving = false;
     }
+  }
+
+  function noExp(e: KeyboardEvent) {
+    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+  }
+
+  function noExpNoDot(e: KeyboardEvent) {
+    if (['e', 'E', '+', '-', '.'].includes(e.key)) e.preventDefault();
   }
 
   load();
@@ -242,11 +294,30 @@
         <div class="space-y-3">
           <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
 
-          {#each editExercises as exercise (exercise._key)}
-            <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-3">
+          {#each editExercises as exercise, exIdx (exercise._key)}
+            <div
+              class="rounded-md border p-4 space-y-3
+                {dragOverIdx === exIdx && dragSrcIdx !== exIdx
+                  ? 'bg-white/8 border-white/30'
+                  : dragSrcIdx === exIdx
+                    ? 'bg-white/3 border-white/10 opacity-50'
+                    : 'bg-white/5 border-white/10'}"
+              role="listitem"
+              draggable="true"
+              data-exidx={exIdx}
+              ondragstart={(e) => onDragStart(exIdx, e)}
+              ondragover={(e) => onDragOver(exIdx, e)}
+              ondrop={() => onDrop(exIdx)}
+              ondragend={onDragEnd}
+            >
 
               <!-- Name + unit + remove -->
-              <div class="flex items-start gap-3">
+              <div class="flex items-start gap-2">
+                <button
+                  class="mt-5 cursor-grab active:cursor-grabbing text-white/20 hover:text-white/50 focus-visible:outline-none touch-none select-none"
+                  aria-label="Drag to reorder"
+                  ontouchstart={() => onTouchStart(exIdx)}
+                >⠿</button>
                 <div class="flex-1 space-y-1">
                   <label for="edit-name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Name</label>
                   <input id="edit-name-{exercise._key}" type="text" bind:value={exercise.name}
@@ -277,14 +348,16 @@
                 {#each exercise.setRows as row, i (i)}
                   <div class="grid grid-cols-[2rem_1fr_1fr_1.5rem] items-center gap-2">
                     <span class="text-xs text-white/30 text-right tabular-nums">{i + 1}</span>
-                    <input type="number" bind:value={row.reps} min="1"
+                    <input type="number" inputmode="numeric" bind:value={row.reps} min="1"
+                      onkeydown={noExpNoDot}
                       class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
-                    <input type="number" min="0" step="0.5" placeholder="—"
+                    <input type="number" inputmode="decimal" min="0" step="0.5" placeholder="—"
                       value={row.weight ?? ''}
                       oninput={(e) => {
                         const v = (e.target as HTMLInputElement).valueAsNumber;
                         row.weight = isNaN(v) ? null : v;
                       }}
+                      onkeydown={noExp}
                       class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20" />
                     <button onclick={() => removeSet(exercise, i)}
                       disabled={exercise.setRows.length === 1}

@@ -1,4 +1,4 @@
-# Workout App Handoff (v7)
+# Workout App Handoff (v8)
 ## Who I am
 I am a beginner building my first full-stack web app. I need step-by-step guidance, including exact commands to run in PowerShell.
 
@@ -120,6 +120,7 @@ All of the following is complete and working:
 - `POST /api/workouts/bulk` — bulk insert with `user_id`, supports `tag` and `set_data`
 - `GET /api/templates` — fetch all templates for user
 - `POST /api/templates` — save new template `{ title, exercises }`
+- `PUT /api/templates?id=xxx` — update template title + exercises
 - `DELETE /api/templates?id=xxx` — delete a template
 - `DELETE /api/admin/users/[id]` — admin only: deletes user + all their data
 
@@ -129,11 +130,11 @@ All of the following is complete and working:
 - `/import` — textarea, parse button, editable preview, save to database. Has "Bulk import" link top-right
 - `/import/bulk` — 3-step flow: copy AI prompt → paste JSON → set date range → preview → import
 - `/workouts` — lists all workouts. Tag badge shown next to workout title. Day filter (All/Push/Pull/Legs/Other), search by title or exercise, relative dates (Today/Yesterday/N days ago), weekly volume summary, confirm-before-delete. Import + New buttons top-right
-- `/workouts/new` — form-based workout entry: title, date, notes, tag picker, exercises with per-set reps+weight rows. Shows "X last" hint below each reps/weight input (matches by exercise name+weight, prefers same tag). Templates picker button top-right if templates exist. Cardio form shown when Cardio tag selected
-- `/workouts/[id]` — detail page. Tag badge shown next to date. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. Per-set display if set_data exists. Cardio display (distance/time/pace) for Cardio tag. "Use as template" button + Edit button. Admin can view any user's workout
+- `/workouts/new` — form-based workout entry: title, date, notes, tag picker, exercises with per-set reps+weight rows. Shows "X last" hint below each reps/weight input (matches by exercise name+weight, prefers same tag). Templates picker button top-right if templates exist. Cardio form shown when Cardio tag selected. Auto-saves draft to localStorage every 3s; "Draft" badge + "Discard draft" button shown when draft exists; draft cleared on successful save. Exercises can be drag-reordered via ⠿ handle (HTML5 DnD on desktop, touch events on mobile)
+- `/workouts/[id]` — detail page. Tag badge shown next to date. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. Per-set display if set_data exists. Cardio display (distance/time/pace) for Cardio tag. "Use as template" button + Edit button. Admin can view any user's workout. Edit mode supports exercise drag-reorder via ⠿ handle (same implementation as /workouts/new)
 - `/progress` — Chart.js line graph. Weight/Reps metric toggle. Clicking a dot navigates to that workout. Filter by Day type, Tag (shown when tagged workouts exist), exercise dropdown, period tabs (All/Year/Month/Week/Day). Total sets counter. Recent sessions list. Reps mode shows reps at heaviest set
 - `/profile` — shows Google avatar, name, email, date joined. Admin badge (red) for nosviland@gmail.com. Sign out button
-- `/records` — personal records page. All-time best weight per exercise, alphabetically sorted, searchable. Each row links to the workout where the PR was set
+- `/records` — personal records page. All-time best weight per exercise, alphabetically sorted, searchable. Tag filter buttons (All / Strength / Hypertrophy / Cardio) appear when tagged workouts exist — filters PRs to only those achieved in workouts of that tag. Each row links to the workout where the PR was set
 - `/settings` — Delete all workouts button with inline confirm prompt
 - `/admin` — admin-only console. Stats (users/workouts/exercises), top exercises chart, full user table with workout counts. Each user row links to drill-down. Accessible via avatar dropdown (Console link, red, admin only)
 - `/admin/users/[id]` — per-user drill-down. Profile card, workout count, join date, full workout list. Delete user button with inline confirm (deletes all user data)
@@ -178,9 +179,34 @@ All of the following is complete and working:
 
 ### Workout templates
 - Stored in `templates` table: `(id, user_id, title, exercises JSON, created_at)`
+- Template exercises shape: `{ name, sets, reps, weight: number | null, unit: string | null }[]`
 - "Use as template" button on `/workouts/[id]` — saves current workout's title + exercises as a template
-- On `/workouts/new` — "Templates" button appears if templates exist (hidden when Cardio tag selected), shows list with Use + Delete per template
+- On `/workouts/new` — "Templates" button appears if templates exist (hidden when Cardio tag selected)
+- Template list shows: Use, Edit, Delete buttons per template
+- Edit opens an inline form (title + per-exercise name/sets/reps/weight/unit) — saves via `PUT /api/templates?id=`
 - Applying a template fills in the title and exercises instantly
+
+### Draft auto-save (on /workouts/new)
+- Form state saved to localStorage key `workout_draft` every 3 seconds
+- On page load: draft is restored automatically if one exists
+- "Draft" pill badge shown in header when a draft is active
+- "Discard draft" button resets the form to defaults and clears localStorage
+- Draft is removed from localStorage on successful workout save
+- Max 1 draft at a time (always overwrites the previous)
+
+### Exercise drag-reorder
+- Available on `/workouts/new` and `/workouts/[id]` (edit mode)
+- Each exercise card has a `⠿` drag handle on the left
+- Desktop: HTML5 `draggable` + `dragstart/dragover/drop/dragend` events
+- Mobile: `touchstart` on the handle; document-level `touchmove`/`touchend` handlers use `elementFromPoint` to find the drop target
+- Visual feedback: dragged card is dimmed (opacity-50), drop target gets a brighter border
+- Touch handlers are registered in `onMount` and cleaned up in `onDestroy`
+
+### Mobile numeric keyboard
+- All `type="number"` inputs use `inputmode` to show the correct mobile keyboard:
+  - `inputmode="numeric"` — reps, sets, minutes, seconds (integer fields)
+  - `inputmode="decimal"` — weight, distance (decimal fields)
+- Applied on `/workouts/new` and `/workouts/[id]`
 
 ### Database
 - Cloudflare D1, database name: `workout-app-db`

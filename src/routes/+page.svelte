@@ -51,7 +51,7 @@
     </div>
 
     <h1 class="max-w-3xl text-4xl font-bold tracking-tight sm:text-6xl">
-      Workout tracking with text import
+      Workout tracking
     </h1>
 
     <p class="mt-6 max-w-2xl text-lg leading-8 text-white/70">

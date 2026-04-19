@@ -14,17 +14,17 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   const workouts = await request.json();
 
   for (const workout of workouts) {
-    await db.prepare('INSERT INTO workouts (id, title, date, user_id) VALUES (?, ?, ?, ?)')
-      .bind(workout.id, workout.title, workout.date, user.id)
+    await db.prepare('INSERT INTO workouts (id, title, date, tag, user_id) VALUES (?, ?, ?, ?, ?)')
+      .bind(workout.id, workout.title, workout.date, workout.tag ?? null, user.id)
       .run();
 
     for (let i = 0; i < workout.exercises.length; i++) {
       const e = workout.exercises[i];
       const eid = `${workout.id}_${i}_${Math.random().toString(36).slice(2)}`;
-      const raw = `${e.name} ${e.sets}x${e.reps}${e.weight != null ? ' ' + e.weight + (e.unit ?? '') : ''}`;
+      const raw = e.raw || `${e.name} ${e.sets}x${e.reps}${e.weight != null ? ' ' + e.weight + (e.unit ?? '') : ''}`;
       await db.prepare(
-        'INSERT INTO exercises (id, workout_id, name, sets, reps, weight, unit, raw) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-      ).bind(eid, workout.id, e.name, e.sets, e.reps, e.weight ?? null, e.unit ?? null, raw).run();
+        'INSERT INTO exercises (id, workout_id, name, sets, reps, weight, unit, raw, set_data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(eid, workout.id, e.name, e.sets, e.reps, e.weight ?? null, e.unit ?? null, raw, e.set_data ?? null).run();
     }
   }
 

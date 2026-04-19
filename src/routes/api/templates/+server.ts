@@ -49,6 +49,27 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   return json({ success: true });
 };
 
+// PUT /api/templates?id=xxx — update title + exercises
+export const PUT: RequestHandler = async ({ request, url, platform }) => {
+  const db = platform?.env.DB;
+  if (!db) return json({ error: 'Database not available' }, { status: 500 });
+
+  const user = await getUser(request, db);
+  if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
+
+  const id = url.searchParams.get('id');
+  if (!id) return json({ error: 'Missing id' }, { status: 400 });
+
+  const { title, exercises } = await request.json();
+
+  await db
+    .prepare('UPDATE templates SET title = ?, exercises = ? WHERE id = ? AND user_id = ?')
+    .bind(title, JSON.stringify(exercises), id, user.id)
+    .run();
+
+  return json({ success: true });
+};
+
 // DELETE /api/templates?id=xxx
 export const DELETE: RequestHandler = async ({ request, url, platform }) => {
   const db = platform?.env.DB;
