@@ -69,6 +69,10 @@
     try {
       allWorkouts = await fetchWorkouts();
       workout = allWorkouts.find((w) => w.id === id) ?? null;
+      if (!workout) {
+        const res = await fetch(`/api/workouts/${id}`);
+        if (res.ok) workout = await res.json();
+      }
     } catch {
       error = 'Could not load workout.';
     } finally {
