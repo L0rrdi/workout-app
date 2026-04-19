@@ -58,7 +58,9 @@
     if (!workout) return 0;
     return workout.exercises.reduce((sum, e) => {
       if (e.set_data) {
-        const rows: SetRow[] = JSON.parse(e.set_data);
+        const parsed = JSON.parse(e.set_data);
+        if (parsed.cardio) return sum;
+        const rows: SetRow[] = parsed;
         return sum + rows.reduce((s, r) => r.weight !== null ? s + r.reps * r.weight : s, 0);
       }
       return e.weight !== null ? sum + e.sets * e.reps * e.weight : sum;
