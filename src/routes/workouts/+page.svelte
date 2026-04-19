@@ -246,14 +246,17 @@
 
             <ul class="divide-y divide-white/5">
               {#each workout.exercises as exercise, i (i)}
+                {@const cardio = (() => { try { const p = JSON.parse(exercise.set_data ?? ''); return p.cardio ? p : null; } catch { return null; } })()}
                 <li class="flex items-center justify-between px-4 py-2 text-sm">
                   <span class="font-medium text-white">{exercise.name}</span>
                   <span class="text-white/40">
-                    {exercise.sets}x{exercise.reps}
-                    {#if exercise.weight !== null}
-                      · {exercise.weight}{exercise.unit}
+                    {#if cardio}
+                      {@const pSec = cardio.timeSeconds / cardio.distanceKm}
+                      {cardio.distanceKm} km · {Math.floor(cardio.timeSeconds / 60)}:{String(cardio.timeSeconds % 60).padStart(2, '0')} · {Math.floor(pSec / 60)}:{String(Math.round(pSec % 60)).padStart(2, '0')}/km
+                    {:else if exercise.weight !== null}
+                      {exercise.sets}x{exercise.reps} · {exercise.weight}{exercise.unit}
                     {:else}
-                      · bodyweight
+                      {exercise.sets}x{exercise.reps} · bodyweight
                     {/if}
                   </span>
                 </li>

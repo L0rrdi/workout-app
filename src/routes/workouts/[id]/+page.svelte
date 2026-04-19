@@ -369,14 +369,25 @@
                 {/if}
               </div>
               {#if exercise.set_data}
-                {@const rows = JSON.parse(exercise.set_data) as SetRow[]}
-                <div class="space-y-0.5">
-                  {#each rows as row, si (si)}
-                    <p class="text-sm text-white/40">
-                      Set {si + 1}: {row.reps} reps{row.weight !== null ? ` @ ${row.weight}${exercise.unit}` : ' · bodyweight'}
-                    </p>
-                  {/each}
-                </div>
+                {@const parsed = JSON.parse(exercise.set_data)}
+                {#if parsed.cardio}
+                  {@const { distanceKm, timeSeconds } = parsed}
+                  {@const pSec = timeSeconds / distanceKm}
+                  <div class="flex gap-6 text-sm text-white/40">
+                    <span>{distanceKm} km</span>
+                    <span>{Math.floor(timeSeconds / 60)}:{String(timeSeconds % 60).padStart(2, '0')}</span>
+                    <span>{Math.floor(pSec / 60)}:{String(Math.round(pSec % 60)).padStart(2, '0')}/km</span>
+                  </div>
+                {:else}
+                  {@const rows = parsed as SetRow[]}
+                  <div class="space-y-0.5">
+                    {#each rows as row, si (si)}
+                      <p class="text-sm text-white/40">
+                        Set {si + 1}: {row.reps} reps{row.weight !== null ? ` @ ${row.weight}${exercise.unit}` : ' · bodyweight'}
+                      </p>
+                    {/each}
+                  </div>
+                {/if}
               {:else}
                 <p class="text-sm text-white/40">
                   {exercise.sets} sets × {exercise.reps} reps{exercise.weight !== null ? ` · ${exercise.weight}${exercise.unit}` : ' · bodyweight'}
