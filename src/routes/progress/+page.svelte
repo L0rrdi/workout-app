@@ -79,10 +79,13 @@
     return null;
   }
 
-  function getMaxReps(e: { reps: number; set_data?: string | null }): number {
+  function getRepsAtMaxWeight(e: { reps: number; weight: number | null; set_data?: string | null }): number {
     if (e.set_data) {
       const rows = JSON.parse(e.set_data) as SetRow[];
-      return Math.max(...rows.map(r => r.reps));
+      const withWeight = rows.filter(r => r.weight !== null);
+      if (withWeight.length === 0) return rows[0]?.reps ?? e.reps;
+      const heaviest = withWeight.reduce((a, b) => (b.weight! > a.weight! ? b : a));
+      return heaviest.reps;
     }
     return e.reps;
   }
@@ -109,20 +112,13 @@
       .forEach(w => {
         const matches = w.exercises.filter(e => e.name.toLowerCase() === selectedExercise.toLowerCase());
         if (matches.length === 0) return;
-        const best = matches.reduce((a, b) => {
-          if (selectedMetric === 'weight') {
-            const aw = getMaxWeight(a) ?? -1;
-            const bw = getMaxWeight(b) ?? -1;
-            return bw > aw ? b : a;
-          } else {
-            return getMaxReps(b) > getMaxReps(a) ? b : a;
-          }
-        });
+        const best = matches.reduce((a, b) =>
+          (getMaxWeight(b) ?? -1) > (getMaxWeight(a) ?? -1) ? b : a
+        );
         const maxWeight = getMaxWeight(best);
-        const maxReps = getMaxReps(best);
+        const maxReps = getRepsAtMaxWeight(best);
         const existing = byDate.get(w.date);
-        const betterThanExisting = !existing ||
-          (selectedMetric === 'weight' ? (maxWeight ?? -1) > (existing.maxWeight ?? -1) : maxReps > existing.maxReps);
+        const betterThanExisting = !existing || (maxWeight ?? -1) > (existing.maxWeight ?? -1);
         if (betterThanExisting) {
           byDate.set(w.date, { date: w.date, workoutId: w.id, maxWeight, maxReps, sets: best.sets, unit: best.unit });
         }
