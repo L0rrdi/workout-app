@@ -52,8 +52,7 @@ You MUST NOT:
 ## Deploy issue — locked folder
 If `npm run build` fails with `EPERM .svelte-kit\cloudflare`, run:
 ```
-taskkill /F /IM node.exe
-rd /s /q C:\Users\nosvi\workout-app\.svelte-kit\cloudflare
+Remove-Item -Recurse -Force .svelte-kit\cloudflare
 npm run build
 npx wrangler deploy
 ```

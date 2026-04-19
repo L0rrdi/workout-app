@@ -8,6 +8,7 @@
 
 	let path = $derived(page.url.pathname);
 	let user = $derived(data.user);
+	let isAdmin = $derived(user?.email === 'nosviland@gmail.com');
 	let showNav = $derived(!path.startsWith('/login'));
 </script>
 
@@ -89,6 +90,15 @@
 						>
 							Settings
 						</a>
+						{#if isAdmin}
+							<div class="my-1 border-t border-white/10"></div>
+							<a
+								href="/admin"
+								class="block px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/5 active:bg-white/10"
+							>
+								Console
+							</a>
+						{/if}
 					</div>
 				</div>
 			</div>

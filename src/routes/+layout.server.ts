@@ -1,7 +1,7 @@
 // src/routes/+layout.server.ts
 import type { LayoutServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { getUser } from '$lib/auth';
+import { getUser, ADMIN_EMAIL } from '$lib/auth';
 
 const PUBLIC_ROUTES = ['/login', '/auth'];
 
@@ -17,5 +17,5 @@ export const load: LayoutServerLoad = async ({ request, platform, url }) => {
     throw redirect(302, '/login');
   }
 
-  return { user };
+  return { user, isAdmin: user?.email === ADMIN_EMAIL };
 };
