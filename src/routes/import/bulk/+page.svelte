@@ -5,7 +5,9 @@
 
   const PROMPT = `You are converting raw handwritten gym workout notes into structured JSON for a workout tracking app.
 
-RETURN ONLY a valid JSON array. No explanation, no markdown, no code fences.
+IMPORTANT: Output at most 500 workout objects per response. If the notes contain more than 500 workouts, output the first 500 and end with the comment "// CONTINUED" on a new line after the closing bracket so the user knows to ask for the next batch.
+
+RETURN ONLY a valid JSON array (plus the optional "// CONTINUED" line). No explanation, no markdown, no code fences.
 
 ━━━ OUTPUT SCHEMA ━━━
 [
@@ -268,7 +270,7 @@ Now convert the following workout notes:`;
         <div class="rounded-md bg-white/5 border border-white/10 p-4 max-h-40 overflow-y-auto">
           <pre class="text-xs text-white/40 whitespace-pre-wrap font-mono leading-relaxed">{PROMPT}</pre>
         </div>
-        <p class="text-xs text-white/30">Paste this prompt into Claude or ChatGPT, then paste your workout notes after it. Copy the JSON it outputs.</p>
+        <p class="text-xs text-white/30">Paste this prompt into Claude or ChatGPT, then paste your workout notes after it. Copy the JSON it outputs. The AI will output up to 500 workouts at a time — if it ends with <span class="font-mono text-white/40">// CONTINUED</span>, import that batch first, then ask it to continue.</p>
       </div>
 
       <!-- JSON input -->
