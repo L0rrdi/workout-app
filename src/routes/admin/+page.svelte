@@ -55,16 +55,16 @@
 		<p class="text-xs font-medium text-white/40 uppercase tracking-wide mb-3">All users</p>
 		<div class="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
 			<!-- Header -->
-			<div class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-2 border-b border-white/10">
+			<div class="grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-2 border-b border-white/10">
 				<div class="w-7"></div>
 				<span class="text-xs font-medium text-white/40 uppercase tracking-wide">User</span>
 				<span class="text-xs font-medium text-white/40 uppercase tracking-wide text-right">Workouts</span>
-				<span class="text-xs font-medium text-white/40 uppercase tracking-wide text-right w-24">Joined</span>
+				<span class="hidden sm:block text-xs font-medium text-white/40 uppercase tracking-wide text-right">Joined</span>
 			</div>
 			<!-- Rows -->
 			<div class="divide-y divide-white/5">
 				{#each data.users as u (u.id)}
-					<a href="/admin/users/{u.id}" class="grid grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20">
+					<a href="/admin/users/{u.id}" class="grid grid-cols-[auto_1fr_auto] sm:grid-cols-[auto_1fr_auto_auto] items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20">
 						{#if u.picture}
 							<img src={u.picture} alt={u.name} referrerpolicy="no-referrer" class="w-7 h-7 rounded-full ring-1 ring-white/10 shrink-0" />
 						{:else}
@@ -77,7 +77,7 @@
 							<p class="text-xs text-white/40 truncate">{u.email}</p>
 						</div>
 						<span class="text-sm text-white/70 text-right tabular-nums">{u.workout_count}</span>
-						<span class="text-xs text-white/30 text-right w-24">{new Date(u.created_at).toLocaleDateString()}</span>
+						<span class="hidden sm:block text-xs text-white/30 text-right">{new Date(u.created_at).toLocaleDateString()}</span>
 					</a>
 				{:else}
 					<div class="px-4 py-8 text-center text-sm text-white/30">No users yet</div>

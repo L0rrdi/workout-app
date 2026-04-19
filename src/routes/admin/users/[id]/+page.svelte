@@ -53,13 +53,13 @@
 	</div>
 
 	<!-- Joined + delete -->
-	<div class="flex items-center justify-between mb-6">
+	<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
 		<p class="text-xs text-white/30">
 			Joined {new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
 		</p>
 
 		{#if confirming}
-			<div class="flex items-center gap-2">
+			<div class="flex flex-wrap items-center gap-2">
 				<span class="text-xs text-red-400">Delete this user?</span>
 				<button
 					onclick={deleteUser}
@@ -78,7 +78,7 @@
 		{:else}
 			<button
 				onclick={() => confirming = true}
-				class="px-3 py-1.5 bg-white/5 border border-red-500/20 text-red-400 rounded-md text-xs hover:bg-red-500/10 active:bg-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
+				class="self-start px-3 py-1.5 bg-white/5 border border-red-500/20 text-red-400 rounded-md text-xs hover:bg-red-500/10 active:bg-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40"
 			>
 				Delete user
 			</button>
