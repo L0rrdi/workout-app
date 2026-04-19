@@ -49,6 +49,27 @@
     allWorkouts = workouts;
   });
 
+  function getLastWeightStr(exerciseName: string, setIndex: number): string | null {
+    const name = exerciseName.trim().toLowerCase();
+    if (!name) return null;
+    const candidates = allWorkouts.filter(w => (w.tag ?? null) === (tag ?? null));
+    for (const w of candidates) {
+      const ex = w.exercises.find(e => e.name.toLowerCase() === name);
+      if (!ex) continue;
+      if (ex.set_data) {
+        try {
+          const rows = JSON.parse(ex.set_data);
+          if (!Array.isArray(rows)) continue;
+          const row = (rows as SetRow[])[setIndex];
+          if (row !== undefined) return row.weight !== null ? `${row.weight}${ex.unit ?? 'kg'}` : 'bw';
+        } catch { continue; }
+      } else if (setIndex === 0) {
+        return ex.weight !== null ? `${ex.weight}${ex.unit ?? 'kg'}` : 'bw';
+      }
+    }
+    return null;
+  }
+
   function getLastReps(exerciseName: string, weight: number | null): number | null {
     const name = exerciseName.trim().toLowerCase();
     if (!name) return null;
@@ -360,15 +381,20 @@
                         <p class="text-[10px] text-white/25 pl-1">↩ {getLastReps(exercise.name, row.weight)} last</p>
                       {/if}
                     </div>
-                    <input
-                      type="number" min="0" step="0.5" placeholder="—"
-                      value={row.weight ?? ''}
-                      oninput={(e) => {
-                        const v = (e.target as HTMLInputElement).valueAsNumber;
-                        row.weight = isNaN(v) ? null : v;
-                      }}
-                      class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
-                    />
+                    <div class="space-y-0.5">
+                      <input
+                        type="number" min="0" step="0.5" placeholder="—"
+                        value={row.weight ?? ''}
+                        oninput={(e) => {
+                          const v = (e.target as HTMLInputElement).valueAsNumber;
+                          row.weight = isNaN(v) ? null : v;
+                        }}
+                        class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                      />
+                      {#if getLastWeightStr(exercise.name, i) !== null}
+                        <p class="text-[10px] text-white/25 pl-1">↩ {getLastWeightStr(exercise.name, i)} last</p>
+                      {/if}
+                    </div>
                     <button
                       onclick={() => removeSet(exercise, i)}
                       disabled={exercise.setRows.length === 1}
