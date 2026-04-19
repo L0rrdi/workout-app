@@ -1,0 +1,261 @@
+<!-- src/routes/workouts/new/+page.svelte -->
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { createWorkout, generateId } from '$lib/storage';
+  import type { ParsedExercise, WeightUnit } from '$lib/parser';
+
+  type FormExercise = { _key: number; name: string; sets: number; reps: number; weight: number | null; unit: string };
+  type Template = { id: string; title: string; exercises: { name: string; sets: number; reps: number; weight: number | null; unit: string | null }[] };
+
+  const today = new Date().toISOString().split('T')[0];
+
+  let title = $state('Workout');
+  let date = $state(today);
+  let notes = $state('');
+  let exercises = $state<FormExercise[]>([{ _key: 0, name: '', sets: 3, reps: 8, weight: null, unit: 'kg' }]);
+  let nextKey = 1;
+  let saving = $state(false);
+  let error = $state('');
+  let templates = $state<Template[]>([]);
+  let showTemplates = $state(false);
+
+  onMount(async () => {
+    const res = await fetch('/api/templates');
+    if (res.ok) templates = await res.json();
+  });
+
+  function applyTemplate(t: Template) {
+    title = t.title;
+    nextKey = t.exercises.length;
+    exercises = t.exercises.map((e, i) => ({
+      _key: i,
+      name: e.name,
+      sets: e.sets,
+      reps: e.reps,
+      weight: e.weight,
+      unit: e.unit ?? 'kg'
+    }));
+    showTemplates = false;
+  }
+
+  async function deleteTemplate(id: string) {
+    await fetch(`/api/templates?id=${id}`, { method: 'DELETE' });
+    templates = templates.filter(t => t.id !== id);
+  }
+
+  function addExercise() {
+    exercises = [...exercises, { _key: nextKey++, name: '', sets: 3, reps: 8, weight: null, unit: 'kg' }];
+  }
+
+  function removeExercise(key: number) {
+    exercises = exercises.filter(e => e._key !== key);
+  }
+
+  async function save() {
+    saving = true;
+    error = '';
+    try {
+      const parsed: ParsedExercise[] = exercises
+        .filter(e => e.name.trim())
+        .map(e => ({
+          name: e.name.trim(),
+          sets: e.sets,
+          reps: e.reps,
+          weight: e.weight,
+          unit: e.weight !== null ? e.unit as WeightUnit : null,
+          raw: ''
+        }));
+      await createWorkout({ id: generateId(), title: title.trim() || 'Workout', date, notes: notes.trim() || null, exercises: parsed });
+      window.location.href = '/workouts';
+    } catch {
+      error = 'Could not save workout.';
+      saving = false;
+    }
+  }
+</script>
+
+<svelte:head><title>New Workout</title></svelte:head>
+
+<div class="min-h-screen bg-neutral-950 text-white">
+  <div class="max-w-2xl mx-auto px-6 py-10 space-y-6">
+
+    <a
+      href="/workouts"
+      class="inline-flex items-center gap-1 text-sm text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
+    >
+      ← Back
+    </a>
+
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold tracking-tight">New Workout</h1>
+      {#if templates.length > 0}
+        <button
+          onclick={() => showTemplates = !showTemplates}
+          class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+        >
+          Templates
+        </button>
+      {/if}
+    </div>
+
+    {#if showTemplates}
+      <div class="rounded-md bg-white/5 border border-white/10 divide-y divide-white/5">
+        {#each templates as t (t.id)}
+          <div class="flex items-center justify-between px-4 py-3">
+            <div>
+              <p class="text-sm font-medium text-white">{t.title}</p>
+              <p class="text-xs text-white/40">{t.exercises.length} exercise{t.exercises.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                onclick={() => applyTemplate(t)}
+                class="px-3 py-1.5 bg-white text-neutral-950 rounded text-xs font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none"
+              >Use</button>
+              <button
+                onclick={() => deleteTemplate(t.id)}
+                class="px-2 py-1.5 text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-xs rounded"
+              >Delete</button>
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    <div class="space-y-5">
+
+      <!-- Title -->
+      <div class="space-y-1.5">
+        <label for="title" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Title</label>
+        <input
+          id="title"
+          type="text"
+          bind:value={title}
+          class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+        />
+      </div>
+
+      <!-- Date -->
+      <div class="space-y-1.5">
+        <label for="date" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Date</label>
+        <input
+          id="date"
+          type="date"
+          bind:value={date}
+          class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 scheme-dark"
+        />
+      </div>
+
+      <!-- Notes -->
+      <div class="space-y-1.5">
+        <label for="notes" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Notes</label>
+        <textarea
+          id="notes"
+          bind:value={notes}
+          rows="3"
+          placeholder="How did the session feel?"
+          class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none"
+        ></textarea>
+      </div>
+
+      <!-- Exercises -->
+      <div class="space-y-3">
+        <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
+
+        {#each exercises as exercise (exercise._key)}
+          <div class="rounded-md bg-white/5 border border-white/10 p-4 space-y-3">
+
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex-1 space-y-1">
+                <label for="name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Exercise name</label>
+                <input
+                  id="name-{exercise._key}"
+                  type="text"
+                  bind:value={exercise.name}
+                  placeholder="e.g. Bench Press"
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
+              </div>
+              <button
+                onclick={() => removeExercise(exercise._key)}
+                class="mt-5 text-white/20 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-lg leading-none"
+                aria-label="Remove exercise"
+              >×</button>
+            </div>
+
+            <div class="grid grid-cols-4 gap-3">
+              <div class="space-y-1">
+                <label for="sets-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Sets</label>
+                <input
+                  id="sets-{exercise._key}"
+                  type="number"
+                  bind:value={exercise.sets}
+                  min="1"
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
+              </div>
+              <div class="space-y-1">
+                <label for="reps-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Reps</label>
+                <input
+                  id="reps-{exercise._key}"
+                  type="number"
+                  bind:value={exercise.reps}
+                  min="1"
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
+              </div>
+              <div class="space-y-1">
+                <label for="weight-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Weight</label>
+                <input
+                  id="weight-{exercise._key}"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="—"
+                  value={exercise.weight ?? ''}
+                  oninput={(e) => {
+                    const v = (e.target as HTMLInputElement).valueAsNumber;
+                    exercise.weight = isNaN(v) ? null : v;
+                  }}
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
+                />
+              </div>
+              <div class="space-y-1">
+                <label for="unit-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Unit</label>
+                <select
+                  id="unit-{exercise._key}"
+                  bind:value={exercise.unit}
+                  disabled={exercise.weight === null}
+                  class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <option value="kg" class="bg-neutral-900">kg</option>
+                  <option value="lbs" class="bg-neutral-900">lbs</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+        {/each}
+
+        <button
+          onclick={addExercise}
+          class="w-full px-4 py-2.5 rounded-md bg-white/5 border border-dashed border-white/10 text-sm text-white/40 hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
+        >
+          + Add exercise
+        </button>
+      </div>
+
+      {#if error}
+        <p class="text-sm text-red-400">{error}</p>
+      {/if}
+
+      <button
+        onclick={save}
+        disabled={saving}
+        class="w-full px-4 py-2.5 bg-white text-neutral-950 rounded-md text-sm font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {saving ? 'Saving…' : 'Save workout'}
+      </button>
+
+    </div>
+  </div>
+</div>

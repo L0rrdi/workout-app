@@ -10,6 +10,7 @@ export interface Workout {
   id: string;
   title: string;
   date: string;
+  notes: string | null;
   exercises: ParsedExercise[];
 }
 

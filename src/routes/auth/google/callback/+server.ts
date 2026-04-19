@@ -67,6 +67,12 @@ export const GET: RequestHandler = async ({ url, platform, cookies }) => {
 
   if (!user) throw redirect(302, '/login?error=1');
 
+  // Auto-generate API token on first login (never overwrites existing)
+  await db.prepare(`
+    INSERT OR IGNORE INTO api_tokens (id, user_id, token, created_at)
+    VALUES (?, ?, ?, datetime('now'))
+  `).bind(crypto.randomUUID(), user.id, 'wkt_' + crypto.randomUUID().replace(/-/g, '')).run();
+
   // Clean up expired sessions globally on each login
   await db.prepare(`DELETE FROM sessions WHERE expires_at < datetime('now')`).run();
 

@@ -100,7 +100,7 @@ Now convert the following workout notes:`;
 
   type Step = 'input' | 'preview' | 'done';
   type BulkExercise = { name: string; sets: number; reps: number; weight: number | null; unit: WeightUnit | null; raw: string };
-  type BulkWorkout = { id: string; title: string; date: string; exercises: BulkExercise[] };
+  type BulkWorkout = { id: string; title: string; date: string; notes: null; exercises: BulkExercise[] };
 
   let step = $state<Step>('input');
   let jsonInput = $state('');
@@ -127,9 +127,9 @@ Now convert the following workout notes:`;
     let idx = 0;
     return workouts.map(w => {
       const id = Date.now().toString(36) + Math.random().toString(36).slice(2);
-      if (w.date) return { ...w, id };
+      if (w.date) return { ...w, id, notes: null as null };
       const d = new Date(start.getTime() + idx++ * interval);
-      return { ...w, id, date: d.toISOString().split('T')[0] };
+      return { ...w, id, notes: null as null, date: d.toISOString().split('T')[0] };
     });
   }
 

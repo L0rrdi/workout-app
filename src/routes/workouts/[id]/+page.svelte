@@ -15,10 +15,26 @@
   let error = $state('');
   let editing = $state(false);
   let saving = $state(false);
+  let templateSaved = $state(false);
+
+  async function saveAsTemplate() {
+    if (!workout) return;
+    await fetch('/api/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: workout.title,
+        exercises: workout.exercises.map(e => ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, unit: e.unit }))
+      })
+    });
+    templateSaved = true;
+    setTimeout(() => { templateSaved = false; }, 2000);
+  }
 
   type EditExercise = ParsedExercise & { _key: number };
   let editTitle = $state('');
   let editDate = $state('');
+  let editNotes = $state('');
   let editExercises = $state<EditExercise[]>([]);
   let nextKey = 0;
 
@@ -59,6 +75,7 @@
     nextKey = workout.exercises.length;
     editTitle = workout.title;
     editDate = workout.date;
+    editNotes = workout.notes ?? '';
     editExercises = workout.exercises.map((e, i) => ({ ...e, _key: i }));
     editing = true;
   }
@@ -81,7 +98,7 @@
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const exercises = editExercises.map(({ _key, ...e }) => e);
-      await updateWorkout({ ...workout, title: editTitle.trim() || 'Untitled Workout', date: editDate, exercises });
+      await updateWorkout({ ...workout, title: editTitle.trim() || 'Untitled Workout', date: editDate, notes: editNotes.trim() || null, exercises });
       await load();
       editing = false;
     } catch {
@@ -155,6 +172,12 @@
             class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20 scheme-dark" />
         </div>
 
+        <div class="space-y-1.5">
+          <label for="edit-notes" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Notes</label>
+          <textarea id="edit-notes" bind:value={editNotes} rows="3" placeholder="How did the session feel?"
+            class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 resize-none"></textarea>
+        </div>
+
         <div class="space-y-3">
           <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Exercises</p>
           {#each editExercises as exercise (exercise._key)}
@@ -217,11 +240,24 @@
           <h1 class="text-2xl font-semibold tracking-tight">{workout.title}</h1>
           <p class="text-sm text-white/30">{fmt(workout.date)}</p>
         </div>
-        <button onclick={startEdit}
-          class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
-          Edit
-        </button>
+        <div class="flex gap-2">
+          <button onclick={saveAsTemplate}
+            class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
+            {templateSaved ? 'Saved!' : 'Use as template'}
+          </button>
+          <button onclick={startEdit}
+            class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
+            Edit
+          </button>
+        </div>
       </div>
+
+      {#if workout.notes}
+        <div class="rounded-md bg-white/5 border border-white/10 px-4 py-3">
+          <p class="text-xs font-medium text-white/40 uppercase tracking-wide mb-1.5">Notes</p>
+          <p class="text-sm text-white/70 whitespace-pre-wrap">{workout.notes}</p>
+        </div>
+      {/if}
 
       <div class="rounded-md bg-white/5 border border-white/10">
         <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between">

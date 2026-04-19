@@ -40,10 +40,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
-  const { id, title, date, exercises } = body;
+  const { id, title, date, notes, exercises } = body;
 
-  await db.prepare('INSERT INTO workouts (id, title, date, user_id) VALUES (?, ?, ?, ?)')
-    .bind(id, title, date, user.id)
+  await db.prepare('INSERT INTO workouts (id, title, date, notes, user_id) VALUES (?, ?, ?, ?, ?)')
+    .bind(id, title, date, notes ?? null, user.id)
     .run();
 
   for (const exercise of exercises) {
@@ -52,6 +52,20 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       .bind(crypto.randomUUID(), id, exercise.name, exercise.sets, exercise.reps, exercise.weight, exercise.unit, exercise.raw)
       .run();
   }
+
+  return json({ success: true });
+};
+
+// DELETE /api/workouts — delete all workouts for the logged-in user
+export const DELETE: RequestHandler = async ({ request, platform }) => {
+  const db = platform?.env.DB;
+  if (!db) return json({ error: 'Database not available' }, { status: 500 });
+
+  const user = await getUser(request, db);
+  if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
+
+  await db.prepare('DELETE FROM exercises WHERE workout_id IN (SELECT id FROM workouts WHERE user_id = ?)').bind(user.id).run();
+  await db.prepare('DELETE FROM workouts WHERE user_id = ?').bind(user.id).run();
 
   return json({ success: true });
 };

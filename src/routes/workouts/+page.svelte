@@ -4,10 +4,14 @@
   import type { Workout } from '$lib/storage';
   import { SvelteMap } from 'svelte/reactivity';
 
+  type DayFilter = 'all' | 'push' | 'pull' | 'legs' | 'other';
+
   let workouts = $state<Workout[]>([]);
   let loading = $state(true);
   let error = $state('');
   let query = $state('');
+  let dayFilter = $state<DayFilter>('all');
+  let confirmDeleteId = $state<string | null>(null);
 
   async function loadWorkouts() {
     try {
@@ -21,13 +25,39 @@
 
   async function handleDelete(id: string) {
     await removeWorkout(id);
+    confirmDeleteId = null;
     await loadWorkouts();
   }
 
   loadWorkouts();
 
-  const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const fmtWeek = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  function relativeDate(dateStr: string): string {
+    const todayMs = Date.now() - (Date.now() % 86400000) - new Date().getTimezoneOffset() * 60000;
+    const dMs = new Date(dateStr + 'T00:00:00').getTime();
+    const diffDays = Math.round((todayMs - dMs) / 86400000);
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays <= 6) return `${diffDays} days ago`;
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(dateStr + 'T00:00:00'));
+  }
+
+  function classifyWorkout(title: string): DayFilter {
+    const t = title.toLowerCase();
+    if (t.includes('push')) return 'push';
+    if (t.includes('pull')) return 'pull';
+    if (t.includes('leg')) return 'legs';
+    return 'other';
+  }
+
+  const dayFilters: { label: string; value: DayFilter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Push', value: 'push' },
+    { label: 'Pull', value: 'pull' },
+    { label: 'Legs', value: 'legs' },
+    { label: 'Other', value: 'other' },
+  ];
 
   function workoutVolume(w: Workout): number {
     return w.exercises.reduce((sum, e) =>
@@ -49,11 +79,11 @@
 
   const filtered = $derived(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return workouts;
-    return workouts.filter(w =>
-      w.title.toLowerCase().includes(q) ||
-      w.exercises.some(e => e.name.toLowerCase().includes(q))
-    );
+    return workouts.filter(w => {
+      if (dayFilter !== 'all' && classifyWorkout(w.title) !== dayFilter) return false;
+      if (!q) return true;
+      return w.title.toLowerCase().includes(q) || w.exercises.some(e => e.name.toLowerCase().includes(q));
+    });
   });
 
   const weeklyVolume = $derived(() => {
@@ -74,12 +104,20 @@
 
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-semibold tracking-tight">Workouts</h1>
-      <a
-        href="/import"
-        class="px-3 py-1.5 bg-white text-neutral-950 rounded-md text-sm font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-      >
-        + Import
-      </a>
+      <div class="flex gap-2">
+        <a
+          href="/import"
+          class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/70 rounded-md text-sm font-medium hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+        >
+          Import
+        </a>
+        <a
+          href="/workouts/new"
+          class="px-3 py-1.5 bg-white text-neutral-950 rounded-md text-sm font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        >
+          + New
+        </a>
+      </div>
     </div>
 
     {#if loading}
@@ -133,6 +171,17 @@
         </div>
       {/if}
 
+      <!-- Day filter -->
+      <div class="flex gap-1.5 flex-wrap">
+        {#each dayFilters as f (f.value)}
+          <button
+            onclick={() => dayFilter = f.value}
+            class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+              {dayFilter === f.value ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+          >{f.label}</button>
+        {/each}
+      </div>
+
       <!-- Search -->
       <input
         type="search"
@@ -161,19 +210,33 @@
                   {workout.title}
                 </a>
                 <div class="flex items-center gap-2 mt-0.5">
-                  <p class="text-xs text-white/30">{fmt(workout.date)}</p>
+                  <p class="text-xs text-white/30">{relativeDate(workout.date)}</p>
                   {#if vol > 0}
                     <span class="text-white/20">·</span>
                     <p class="text-xs text-white/25">{vol.toLocaleString()} kg</p>
                   {/if}
                 </div>
               </div>
-              <button
-                onclick={() => handleDelete(workout.id)}
-                class="text-xs text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 rounded px-1"
-              >
-                Delete
-              </button>
+              {#if confirmDeleteId === workout.id}
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-white/40">Sure?</span>
+                  <button
+                    onclick={() => handleDelete(workout.id)}
+                    class="text-xs text-red-400 hover:text-red-300 active:text-red-500 focus-visible:outline-none rounded px-1"
+                  >Yes</button>
+                  <button
+                    onclick={() => confirmDeleteId = null}
+                    class="text-xs text-white/30 hover:text-white active:text-white/60 focus-visible:outline-none rounded px-1"
+                  >No</button>
+                </div>
+              {:else}
+                <button
+                  onclick={() => confirmDeleteId = workout.id}
+                  class="text-xs text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/40 rounded px-1"
+                >
+                  Delete
+                </button>
+              {/if}
             </div>
 
             <ul class="divide-y divide-white/5">

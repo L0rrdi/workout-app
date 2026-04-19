@@ -43,25 +43,54 @@
 		>
 			Import
 		</a>
+		<a
+			href="/workouts/new"
+			class="text-sm font-medium px-3 py-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50
+				{path === '/workouts/new' ? 'bg-white text-neutral-950' : 'bg-white/10 text-white hover:bg-white hover:text-neutral-950 active:bg-white/75'}"
+		>
+			+ Add
+		</a>
 		{#if user}
-			<div class="pl-2 border-l border-white/10">
-				<a
-					href="/profile"
-					class="flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded"
-				>
+			<div class="relative group pl-2 border-l border-white/10">
+				<!-- Avatar -->
+				<button class="flex items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded">
 					{#if user.picture}
 						<img
 							src={user.picture}
 							alt={user.name}
 							referrerpolicy="no-referrer"
-							class="w-7 h-7 rounded-full ring-1 ring-white/10 hover:ring-white/30"
+							class="w-7 h-7 rounded-full ring-1 ring-white/10 group-hover:ring-white/30"
 						/>
 					{:else}
-						<div class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60 hover:bg-white/20">
+						<div class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white/60 group-hover:bg-white/20">
 							{user.name[0]}
 						</div>
 					{/if}
-				</a>
+				</button>
+
+				<!-- Dropdown — pt-2 bridges the gap so hover doesn't break -->
+				<div class="absolute right-0 top-full pt-2 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition duration-150 -translate-y-1 group-hover:translate-y-0 z-50">
+					<div class="w-36 rounded-md bg-neutral-900 border border-white/10 py-1 shadow-xl">
+						<a
+							href="/profile"
+							class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10"
+						>
+							Profile
+						</a>
+						<a
+							href="/records"
+							class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10"
+						>
+							Records
+						</a>
+						<a
+							href="/settings"
+							class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10"
+						>
+							Settings
+						</a>
+					</div>
+				</div>
 			</div>
 		{/if}
 	</div>

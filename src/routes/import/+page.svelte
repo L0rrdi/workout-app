@@ -25,6 +25,7 @@
       id: generateId(),
       title: workoutTitle.trim() || 'Untitled Workout',
       date: new Date().toISOString().split('T')[0],
+      notes: null,
       exercises
     });
     savedMessage = 'Workout saved!';
