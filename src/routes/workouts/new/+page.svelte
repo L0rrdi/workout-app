@@ -49,46 +49,48 @@
     allWorkouts = workouts;
   });
 
-  function getLastWeightStr(exerciseName: string, setIndex: number): string | null {
+  function findLastExercise(exerciseName: string) {
     const name = exerciseName.trim().toLowerCase();
     if (!name) return null;
-    const candidates = allWorkouts.filter(w => (w.tag ?? null) === (tag ?? null));
-    for (const w of candidates) {
-      const ex = w.exercises.find(e => e.name.toLowerCase() === name);
-      if (!ex) continue;
-      if (ex.set_data) {
-        try {
-          const rows = JSON.parse(ex.set_data);
-          if (!Array.isArray(rows)) continue;
-          const row = (rows as SetRow[])[setIndex];
-          if (row !== undefined) return row.weight !== null ? `${row.weight}${ex.unit ?? 'kg'}` : 'bw';
-        } catch { continue; }
-      } else if (setIndex === 0) {
-        return ex.weight !== null ? `${ex.weight}${ex.unit ?? 'kg'}` : 'bw';
+    // First pass: same tag. Second pass: any tag as fallback.
+    for (const sameTagOnly of [true, false]) {
+      for (const w of allWorkouts) {
+        if (sameTagOnly && (w.tag ?? null) !== (tag ?? null)) continue;
+        const ex = w.exercises.find(e => e.name.toLowerCase() === name);
+        if (ex) return ex;
       }
     }
     return null;
   }
 
-  function getLastReps(exerciseName: string, weight: number | null): number | null {
-    const name = exerciseName.trim().toLowerCase();
-    if (!name) return null;
-    const candidates = allWorkouts.filter(w => (w.tag ?? null) === (tag ?? null));
-    for (const w of candidates) {
-      const ex = w.exercises.find(e => e.name.toLowerCase() === name);
-      if (!ex) continue;
-      if (ex.set_data) {
-        try {
-          const rows = JSON.parse(ex.set_data);
-          if (!Array.isArray(rows)) continue;
-          const match = (rows as SetRow[]).find(r => r.weight === weight);
-          if (match !== undefined) return match.reps;
-        } catch { continue; }
-      } else if (ex.weight === weight) {
-        return ex.reps;
-      }
+  function getLastWeightStr(exerciseName: string, setIndex: number): string | null {
+    const ex = findLastExercise(exerciseName);
+    if (!ex) return null;
+    if (ex.set_data) {
+      try {
+        const rows = JSON.parse(ex.set_data);
+        if (!Array.isArray(rows)) return null;
+        const row = (rows as SetRow[])[setIndex];
+        if (row === undefined) return null;
+        return row.weight !== null ? `${row.weight}${ex.unit ?? 'kg'}` : 'bw';
+      } catch { return null; }
     }
+    if (setIndex === 0) return ex.weight !== null ? `${ex.weight}${ex.unit ?? 'kg'}` : 'bw';
     return null;
+  }
+
+  function getLastReps(exerciseName: string, weight: number | null): number | null {
+    const ex = findLastExercise(exerciseName);
+    if (!ex) return null;
+    if (ex.set_data) {
+      try {
+        const rows = JSON.parse(ex.set_data);
+        if (!Array.isArray(rows)) return null;
+        const match = (rows as SetRow[]).find(r => r.weight === weight);
+        return match !== undefined ? match.reps : null;
+      } catch { return null; }
+    }
+    return ex.weight === weight ? ex.reps : null;
   }
 
   function applyTemplate(t: Template) {
@@ -378,7 +380,7 @@
                         class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
                       />
                       {#if getLastReps(exercise.name, row.weight) !== null}
-                        <p class="text-[10px] text-white/25 pl-1">↩ {getLastReps(exercise.name, row.weight)} last</p>
+                        <p class="text-[10px] text-white/25 pl-1">{getLastReps(exercise.name, row.weight)} last</p>
                       {/if}
                     </div>
                     <div class="space-y-0.5">
@@ -392,7 +394,7 @@
                         class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
                       />
                       {#if getLastWeightStr(exercise.name, i) !== null}
-                        <p class="text-[10px] text-white/25 pl-1">↩ {getLastWeightStr(exercise.name, i)} last</p>
+                        <p class="text-[10px] text-white/25 pl-1">{getLastWeightStr(exercise.name, i)} last</p>
                       {/if}
                     </div>
                     <button
