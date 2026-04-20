@@ -1,5 +1,5 @@
 import { json, error } from '@sveltejs/kit';
-import { getUser, ADMIN_EMAIL } from '$lib/auth';
+import { getUser } from '$lib/auth';
 import type { RequestHandler } from './$types';
 
 export const DELETE: RequestHandler = async ({ request, platform, params }) => {
@@ -7,7 +7,8 @@ export const DELETE: RequestHandler = async ({ request, platform, params }) => {
   if (!db) throw error(500, 'Database unavailable');
 
   const admin = await getUser(request, db);
-  if (!admin || admin.email !== ADMIN_EMAIL) throw error(403, 'Forbidden');
+  const adminEmail = platform?.env.ADMIN_EMAIL ?? '';
+  if (!admin || admin.email !== adminEmail) throw error(403, 'Forbidden');
   if (admin.id === params.id) throw error(400, 'Cannot delete your own account');
 
   await db.prepare(`

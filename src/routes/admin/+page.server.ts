@@ -1,13 +1,14 @@
 import type { PageServerLoad } from './$types';
 import { redirect, error } from '@sveltejs/kit';
-import { getUser, ADMIN_EMAIL } from '$lib/auth';
+import { getUser } from '$lib/auth';
 
 export const load: PageServerLoad = async ({ request, platform }) => {
   const db = platform?.env.DB;
   if (!db) throw error(500, 'Database unavailable');
 
   const user = await getUser(request, db);
-  if (!user || user.email !== ADMIN_EMAIL) throw redirect(302, '/');
+  const adminEmail = platform?.env.ADMIN_EMAIL ?? '';
+  if (!user || user.email !== adminEmail) throw redirect(302, '/');
 
   const [userCount, workoutCount, exerciseCount, allUsers, recentActivity, topExercises] = await Promise.all([
     db.prepare('SELECT COUNT(*) as count FROM users').first<{ count: number }>(),

@@ -1,7 +1,7 @@
 // src/routes/api/workouts/[id]/+server.ts
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from '@sveltejs/kit';
-import { getUser, ADMIN_EMAIL } from '$lib/auth';
+import { getUser } from '$lib/auth';
 
 // GET /api/workouts/:id — fetch a single workout (admin can access any)
 export const GET: RequestHandler = async ({ params, request, platform }) => {
@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
   if (!user) return json({ error: 'Unauthorized' }, { status: 401 });
 
   const { id } = params;
-  const isAdmin = user.email === ADMIN_EMAIL;
+  const isAdmin = user.email === (platform?.env.ADMIN_EMAIL ?? '');
 
   const workout = isAdmin
     ? await db.prepare('SELECT * FROM workouts WHERE id = ?').bind(id).first<Record<string, unknown>>()

@@ -4,6 +4,7 @@ namespace App {
 interface Platform {
 env: {
 DB: D1Database;
+ADMIN_EMAIL: string;
 };
 context: ExecutionContext;
 caches: CacheStorage & { default: Cache };

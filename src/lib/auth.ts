@@ -48,4 +48,3 @@ export async function getUser(request: Request, db: D1Database): Promise<User | 
   return row ?? null;
 }
 
-export const ADMIN_EMAIL = 'nosviland@gmail.com';
