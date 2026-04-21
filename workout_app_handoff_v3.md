@@ -1,4 +1,4 @@
-# Workout App Handoff (v8)
+# Workout App Handoff (v9)
 ## Who I am
 I am a beginner building my first full-stack web app. I need step-by-step guidance, including exact commands to run in PowerShell.
 
@@ -67,7 +67,7 @@ All of the following is complete and working:
 - Sessions stored in D1 `sessions` table (30-day persistent cookies)
 - `getUser(request, db)` — checks `Authorization: Bearer <token>` first, then falls back to session cookie
 - `getSessionId(request)` — reads raw session ID from cookie header
-- `ADMIN_EMAIL = 'nosviland@gmail.com'` — used for admin badge
+- Admin email is NOT hardcoded — read from `platform.env.ADMIN_EMAIL` in each server file that needs it (stored as Cloudflare secret + in `.dev.vars` for local)
 - User interface: `{ id, google_id, email, name, picture, created_at }`
 - OAuth state parameter used (CSRF protection)
 - Fetch timeouts on Google API calls (10s)
@@ -93,8 +93,12 @@ All of the following is complete and working:
 - Passes `user` and `isAdmin` to layout
 
 ### Security
-- `src/hooks.server.ts` — sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` headers
+- `src/hooks.server.ts` — sets `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Content-Security-Policy` headers
+- CSP allows: `'self'`, inline scripts/styles (needed by SvelteKit), Google profile images (`lh3.googleusercontent.com`)
 - `handleError` logs errors with method + path to Cloudflare logs
+- All API endpoints that touch workouts/exercises verify ownership via `WHERE user_id = ?` OR an explicit ownership `SELECT` before any writes (PUT `/api/workouts/[id]` now checks ownership before the UPDATE/DELETE — previously the DELETE could wipe another user's exercises)
+- `POST /api/workouts/bulk` — max 500 workouts per request (returns 400 if exceeded)
+- Number inputs (`type="number"`) block `e`, `E`, `+`, `-` via `onkeydown` on desktop; integer-only fields (reps/sets/minutes/seconds) also block `.`. Mobile keyboards unaffected (they use `inputmode`)
 
 ### Parser module — `src/lib/parser.ts`
 - Parses workout text into structured exercises
@@ -117,7 +121,7 @@ All of the following is complete and working:
 - `PUT /api/workouts/[id]` — updates workout title, date, notes, tag, exercises, set_data (checks ownership)
 - `DELETE /api/workouts/[id]` — verifies ownership, deletes exercises first, then workout
 - `DELETE /api/workouts` — deletes ALL workouts for the user (used by Settings page)
-- `POST /api/workouts/bulk` — bulk insert with `user_id`, supports `tag` and `set_data`
+- `POST /api/workouts/bulk` — bulk insert with `user_id`, supports `tag` and `set_data`. Rejects requests with > 500 workouts (returns 400)
 - `GET /api/templates` — fetch all templates for user
 - `POST /api/templates` — save new template `{ title, exercises }`
 - `PUT /api/templates?id=xxx` — update template title + exercises
@@ -128,7 +132,7 @@ All of the following is complete and working:
 - `/login` — "Sign in with Google" button, no nav shown
 - `/` — home page. Title "Workout tracking". Shows workout count + streak (2+ days). "+ New workout" button → /workouts/new. "View workouts" button → /workouts
 - `/import` — textarea, parse button, editable preview, save to database. Has "Bulk import" link top-right
-- `/import/bulk` — 3-step flow: copy AI prompt → paste JSON → set date range → preview → import
+- `/import/bulk` — 3-step flow: copy AI prompt → paste JSON → set date range → preview → import. Prompt instructs the AI to output max 500 workouts and append `// CONTINUED` if truncated so user can do multiple batches
 - `/workouts` — lists all workouts. Tag badge shown next to workout title. Day filter (All/Push/Pull/Legs/Other), search by title or exercise, relative dates (Today/Yesterday/N days ago), weekly volume summary, confirm-before-delete. Import + New buttons top-right
 - `/workouts/new` — form-based workout entry: title, date, notes, tag picker, exercises with per-set reps+weight rows. Shows "X last" hint below each reps/weight input (matches by exercise name+weight, prefers same tag). Templates picker button top-right if templates exist. Cardio form shown when Cardio tag selected. Auto-saves draft to localStorage every 3s; "Draft" badge + "Discard draft" button shown when draft exists; draft cleared on successful save. Exercises can be drag-reordered via ⠿ handle (HTML5 DnD on desktop, touch events on mobile)
 - `/workouts/[id]` — detail page. Tag badge shown next to date. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. Per-set display if set_data exists. Cardio display (distance/time/pace) for Cardio tag. "Use as template" button + Edit button. Admin can view any user's workout. Edit mode supports exercise drag-reorder via ⠿ handle (same implementation as /workouts/new)
@@ -224,7 +228,10 @@ All of the following is complete and working:
 - `GOOGLE_CLIENT_ID` — Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` — Google OAuth client secret
 - `SESSION_SECRET` — random 32-byte hex string
+- `ADMIN_EMAIL` — email address that gets admin privileges (e.g. Console, delete users)
 - Local dev: stored in `.dev.vars` (gitignored)
+- Typed on `App.Platform['env']` in `src/app.d.ts`
+- Upload new secrets with `echo "value" | npx wrangler secret put NAME`
 
 ### Deployment
 - Live at: https://workout-app.nosviland.workers.dev
