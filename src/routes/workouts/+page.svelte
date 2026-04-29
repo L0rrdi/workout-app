@@ -205,7 +205,7 @@
                 href="/workouts/{workout.id}"
                 title="Has notes"
                 aria-label="Has notes"
-                class="absolute -right-2 -top-2 w-6 h-6 flex items-center justify-center rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 text-sm font-bold shadow-md hover:bg-amber-500/30 hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+                class="absolute -right-2 -top-2 w-6 h-6 flex items-center justify-center rounded-md bg-neutral-900 border border-white/15 text-white/70 text-sm font-bold shadow-md hover:bg-neutral-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
               >!</a>
             {/if}
 
