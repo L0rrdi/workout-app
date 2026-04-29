@@ -135,6 +135,13 @@
     return () => { document.body.style.overflow = ''; };
   });
 
+  // Move the modal node out of the .page-fade wrapper (which applies a
+  // transform and breaks `position: fixed` relative to the viewport)
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy() { node.remove(); } };
+  }
+
   // Drag state
   let dragSrcIdx = $state<number | null>(null);
   let dragOverIdx = $state<number | null>(null);
@@ -510,7 +517,7 @@
 </div>
 
 {#if showUnsavedModal}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
+  <div use:portal class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
     <div class="w-full max-w-sm rounded-md bg-neutral-900 border border-white/10 p-5 space-y-4 shadow-2xl">
       <div class="space-y-1">
         <p class="text-base font-semibold text-white">Unsaved changes</p>
