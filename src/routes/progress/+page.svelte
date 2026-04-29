@@ -301,6 +301,15 @@
             <select
               id="exercise-select"
               bind:value={selectedExercise}
+              onwheel={(e) => {
+                if (exerciseNames.length === 0) return;
+                e.preventDefault();
+                const idx = exerciseNames.indexOf(selectedExercise);
+                const next = e.deltaY > 0
+                  ? Math.min(idx + 1, exerciseNames.length - 1)
+                  : Math.max(idx - 1, 0);
+                if (next !== idx) selectedExercise = exerciseNames[next];
+              }}
               class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
             >
               {#each exerciseNames as name (name)}

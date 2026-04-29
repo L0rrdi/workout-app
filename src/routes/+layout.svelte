@@ -48,13 +48,6 @@
 				Progress
 			</a>
 			<a
-				href="/import"
-				class="text-sm font-medium px-3 py-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50
-					{path === '/import' ? 'bg-white text-neutral-950' : 'bg-white/10 text-white hover:bg-white hover:text-neutral-950 active:bg-white/75'}"
-			>
-				Import
-			</a>
-			<a
 				href="/workouts/new"
 				class="text-sm font-medium px-3 py-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50
 					{path === '/workouts/new' ? 'bg-white text-neutral-950' : 'bg-white/10 text-white hover:bg-white hover:text-neutral-950 active:bg-white/75'}"
@@ -76,6 +69,7 @@
 						<div class="w-36 rounded-md bg-neutral-900 border border-white/10 py-1 shadow-xl">
 							<a href="/profile" class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10">Profile</a>
 							<a href="/records" class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10">Records</a>
+							<a href="/import" class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10">Import</a>
 							<a href="/settings" class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10">Settings</a>
 							{#if isAdmin}
 								<div class="my-1 border-t border-white/10"></div>
@@ -108,9 +102,6 @@
 			<a href="/progress" class="flex items-center px-3 py-2.5 rounded-md text-sm {path.startsWith('/progress') ? 'text-white font-medium bg-white/5' : 'text-white/60 hover:text-white hover:bg-white/5'} active:bg-white/10">
 				Progress
 			</a>
-			<a href="/import" class="flex items-center px-3 py-2.5 rounded-md text-sm {path === '/import' ? 'text-white font-medium bg-white/5' : 'text-white/60 hover:text-white hover:bg-white/5'} active:bg-white/10">
-				Import
-			</a>
 			<a href="/workouts/new" class="flex items-center px-3 py-2.5 rounded-md text-sm {path === '/workouts/new' ? 'text-white font-medium bg-white/5' : 'text-white/60 hover:text-white hover:bg-white/5'} active:bg-white/10">
 				+ New
 			</a>
@@ -125,6 +116,7 @@
 					Profile
 				</a>
 				<a href="/records" class="flex items-center px-3 py-2.5 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/5 active:bg-white/10">Records</a>
+				<a href="/import" class="flex items-center px-3 py-2.5 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/5 active:bg-white/10">Import</a>
 				<a href="/settings" class="flex items-center px-3 py-2.5 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/5 active:bg-white/10">Settings</a>
 				{#if isAdmin}
 					<a href="/admin" class="flex items-center px-3 py-2.5 rounded-md text-sm text-red-400 hover:text-red-300 hover:bg-white/5 active:bg-white/10">Console</a>

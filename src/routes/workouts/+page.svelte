@@ -112,12 +112,6 @@
           Templates
         </a>
         <a
-          href="/import"
-          class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/70 rounded-md text-sm font-medium hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
-        >
-          Import
-        </a>
-        <a
           href="/workouts/new"
           class="px-3 py-1.5 bg-white text-neutral-950 rounded-md text-sm font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
         >
