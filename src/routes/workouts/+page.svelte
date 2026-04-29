@@ -106,6 +106,12 @@
       <h1 class="text-2xl font-semibold tracking-tight">Workouts</h1>
       <div class="flex gap-2">
         <a
+          href="/templates"
+          class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/70 rounded-md text-sm font-medium hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+        >
+          Templates
+        </a>
+        <a
           href="/import"
           class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/70 rounded-md text-sm font-medium hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
         >

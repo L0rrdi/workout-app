@@ -39,6 +39,7 @@
   let error = $state('');
   let templates = $state<Template[]>([]);
   let showTemplates = $state(false);
+  let confirmDeleteTemplateId = $state<string | null>(null);
   let allWorkouts = $state<Workout[]>([]);
   let hasDraft = $state(false);
   let draftReady = $state(false);
@@ -483,18 +484,29 @@
                 <p class="text-xs text-white/40">{t.exercises.length} exercise{t.exercises.length !== 1 ? 's' : ''}</p>
               </div>
               <div class="flex gap-2">
-                <button
-                  onclick={() => applyTemplate(t)}
-                  class="px-3 py-1.5 bg-white text-neutral-950 rounded text-xs font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none"
-                >Use</button>
-                <button
-                  onclick={() => startEditTemplate(t)}
-                  class="px-2 py-1.5 text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none text-xs rounded"
-                >Edit</button>
-                <button
-                  onclick={() => deleteTemplate(t.id)}
-                  class="px-2 py-1.5 text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-xs rounded"
-                >Delete</button>
+                {#if confirmDeleteTemplateId === t.id}
+                  <button
+                    onclick={() => { deleteTemplate(t.id); confirmDeleteTemplateId = null; }}
+                    class="px-3 py-1.5 bg-red-500/15 border border-red-500/25 text-red-400 rounded text-xs font-medium hover:bg-red-500/25 active:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30"
+                  >Confirm delete</button>
+                  <button
+                    onclick={() => confirmDeleteTemplateId = null}
+                    class="px-2 py-1.5 text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none text-xs rounded"
+                  >Cancel</button>
+                {:else}
+                  <button
+                    onclick={() => applyTemplate(t)}
+                    class="px-3 py-1.5 bg-white text-neutral-950 rounded text-xs font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none"
+                  >Use</button>
+                  <button
+                    onclick={() => startEditTemplate(t)}
+                    class="px-2 py-1.5 text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none text-xs rounded"
+                  >Edit</button>
+                  <button
+                    onclick={() => confirmDeleteTemplateId = t.id}
+                    class="px-2 py-1.5 text-white/30 hover:text-red-400 active:text-red-500 focus-visible:outline-none text-xs rounded"
+                  >Delete</button>
+                {/if}
               </div>
             </div>
           {/if}

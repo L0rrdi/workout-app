@@ -5,6 +5,7 @@
   import type { Workout, SetRow } from '$lib/storage';
   import type { WeightUnit } from '$lib/parser';
   import { page } from '$app/state';
+  import { beforeNavigate, goto } from '$app/navigation';
   import { SvelteMap } from 'svelte/reactivity';
 
   const id = page.params.id;
@@ -16,6 +17,16 @@
   let error = $state('');
   let editing = $state(false);
   let saving = $state(false);
+
+  // Unsaved-changes guard
+  let editSnapshot = '';
+  let allowNavigation = false;
+  let pendingNav = $state<string | null>(null);
+  let showUnsavedModal = $state(false);
+
+  function snapshotEdit() {
+    return JSON.stringify({ editTitle, editDate, editNotes, editTag, editExercises });
+  }
 
   const TAGS = ['Strength', 'Hypertrophy'];
 
@@ -84,9 +95,38 @@
         : Array.from({ length: e.sets }, () => ({ reps: e.reps, weight: e.weight }))
     }));
     editing = true;
+    editSnapshot = snapshotEdit();
   }
 
   function cancelEdit() { editing = false; }
+
+  beforeNavigate(({ cancel, to }) => {
+    if (allowNavigation) return;
+    if (!editing) return;
+    if (snapshotEdit() === editSnapshot) return; // no changes
+    if (!to) return;
+    cancel();
+    pendingNav = to.url.pathname + to.url.search;
+    showUnsavedModal = true;
+  });
+
+  async function saveAndLeave() {
+    await saveEdit();
+    if (error) { showUnsavedModal = false; return; }
+    allowNavigation = true;
+    if (pendingNav) goto(pendingNav);
+  }
+
+  function discardAndLeave() {
+    allowNavigation = true;
+    showUnsavedModal = false;
+    if (pendingNav) goto(pendingNav);
+  }
+
+  function stayOnPage() {
+    showUnsavedModal = false;
+    pendingNav = null;
+  }
 
   // Drag state
   let dragSrcIdx = $state<number | null>(null);
@@ -461,3 +501,34 @@
 
   </div>
 </div>
+
+{#if showUnsavedModal}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
+    <div class="w-full max-w-sm rounded-md bg-neutral-900 border border-white/10 p-5 space-y-4 shadow-2xl">
+      <div class="space-y-1">
+        <p class="text-base font-semibold text-white">Unsaved changes</p>
+        <p class="text-sm text-white/50">Do you want to save your changes before leaving?</p>
+      </div>
+      <div class="flex flex-col gap-2">
+        <button
+          onclick={saveAndLeave} disabled={saving}
+          class="w-full px-4 py-2 bg-white text-neutral-950 rounded-md text-sm font-medium hover:bg-white/90 active:bg-white/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving…' : 'Save & leave'}
+        </button>
+        <button
+          onclick={discardAndLeave} disabled={saving}
+          class="w-full px-4 py-2 bg-white/5 border border-white/10 text-white/70 rounded-md text-sm font-medium hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Discard changes
+        </button>
+        <button
+          onclick={stayOnPage} disabled={saving}
+          class="w-full px-4 py-2 text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Stay on page
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
