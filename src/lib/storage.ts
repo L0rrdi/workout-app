@@ -7,7 +7,7 @@
 import type { ParsedExercise } from '$lib/parser';
 
 export interface SetRow {
-  reps: number;
+  reps: number | null;
   weight: number | null;
 }
 

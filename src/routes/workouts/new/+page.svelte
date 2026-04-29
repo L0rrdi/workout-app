@@ -6,8 +6,8 @@
   import type { WeightUnit } from '$lib/parser';
 
   type FormExercise = { _key: number; name: string; unit: string; setRows: SetRow[] };
-  type TemplateExercise = { name: string; sets: number; reps: number; weight: number | null; unit: string | null };
-  type Template = { id: string; title: string; exercises: TemplateExercise[] };
+  type TemplateExercise = { name: string; sets: number; reps: number | null; weight: number | null; unit: string | null };
+  type Template = { id: string; title: string; tag: string | null; exercises: TemplateExercise[] };
 
   const today = new Date().toISOString().split('T')[0];
   const TAGS = ['Strength', 'Hypertrophy', 'Cardio'];
@@ -257,6 +257,7 @@
 
   function applyTemplate(t: Template) {
     title = t.title;
+    tag = t.tag;
     nextKey = t.exercises.length;
     exercises = t.exercises.map((e, i) => ({
       _key: i,
@@ -467,7 +468,12 @@
             <!-- Normal template row -->
             <div class="flex items-center justify-between px-4 py-3">
               <div>
-                <p class="text-sm font-medium text-white">{t.title}</p>
+                <div class="flex items-center gap-2">
+                  <p class="text-sm font-medium text-white">{t.title}</p>
+                  {#if t.tag}
+                    <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-white/10 text-white/60 border border-white/10">{t.tag}</span>
+                  {/if}
+                </div>
                 <p class="text-xs text-white/40">{t.exercises.length} exercise{t.exercises.length !== 1 ? 's' : ''}</p>
               </div>
               <div class="flex gap-2">

@@ -18,6 +18,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTitle.trim() || 'Template',
+          tag: data.workout.tag,
           exercises: data.exercises
         })
       });
@@ -36,7 +37,7 @@
       const res = await fetch(`/api/templates?id=${templateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, exercises: data.exercises })
+        body: JSON.stringify({ title, tag: data.workout.tag, exercises: data.exercises })
       });
       if (!res.ok) throw new Error();
       window.location.href = `/workouts/${data.workout.id}`;
@@ -88,7 +89,12 @@
         <div class="rounded-md bg-white/5 border border-white/10 divide-y divide-white/5">
           {#each data.templates as t (t.id)}
             <div class="flex items-center justify-between px-4 py-3">
-              <p class="text-sm font-medium text-white">{t.title}</p>
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-medium text-white">{t.title}</p>
+                {#if t.tag}
+                  <span class="px-1.5 py-0.5 rounded text-xs font-medium bg-white/10 text-white/60 border border-white/10">{t.tag}</span>
+                {/if}
+              </div>
               {#if confirmId === t.id}
                 <div class="flex gap-2">
                   <button
