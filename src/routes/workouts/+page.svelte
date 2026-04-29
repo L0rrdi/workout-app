@@ -199,7 +199,15 @@
       <div class="space-y-4">
         {#each filtered() as workout (workout.id)}
           {@const vol = workoutVolume(workout)}
-          <div class="rounded-md bg-white/5 border border-white/10">
+          <div class="relative rounded-md bg-white/5 border border-white/10">
+            {#if workout.notes && workout.notes.trim()}
+              <a
+                href="/workouts/{workout.id}"
+                title="Has notes"
+                aria-label="Has notes"
+                class="absolute -right-2 -top-2 w-6 h-6 flex items-center justify-center rounded-md bg-amber-500/20 border border-amber-500/30 text-amber-300 text-sm font-bold shadow-md hover:bg-amber-500/30 hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40"
+              >!</a>
+            {/if}
 
             <div class="flex items-center justify-between px-4 py-3 border-b border-white/10">
               <div>
