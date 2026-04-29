@@ -41,6 +41,7 @@
   let showTemplates = $state(false);
   let allWorkouts = $state<Workout[]>([]);
   let hasDraft = $state(false);
+  let draftReady = $state(false);
 
   // Draft
   const DRAFT_KEY = 'workout_draft';
@@ -85,7 +86,12 @@
     cardioSeconds = 0;
   }
 
-  let draftInterval: ReturnType<typeof setInterval>;
+  // Save draft on every state change (after the initial load completes)
+  $effect(() => {
+    // Read all draft fields so the effect tracks them
+    JSON.stringify({ title, date, notes, tag, exercises, cardioActivity, cardioDistance, cardioMinutes, cardioSeconds });
+    if (draftReady) saveDraft();
+  });
 
   // Drag state
   let dragSrcIdx = $state<number | null>(null);
@@ -172,7 +178,7 @@
 
   onMount(async () => {
     loadDraft();
-    draftInterval = setInterval(saveDraft, 3000);
+    draftReady = true;
 
     touchMoveHandler = (e: TouchEvent) => {
       if (touchSrcIdx === null) return;
@@ -206,7 +212,6 @@
   });
 
   onDestroy(() => {
-    clearInterval(draftInterval);
     if (touchMoveHandler) document.removeEventListener('touchmove', touchMoveHandler);
     if (touchEndHandler) document.removeEventListener('touchend', touchEndHandler);
   });
@@ -258,6 +263,7 @@
   function applyTemplate(t: Template) {
     title = t.title;
     tag = t.tag;
+    date = new Date().toISOString().split('T')[0];
     nextKey = t.exercises.length;
     exercises = t.exercises.map((e, i) => ({
       _key: i,
