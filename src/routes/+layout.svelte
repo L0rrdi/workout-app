@@ -75,6 +75,8 @@
 								<div class="my-1 border-t border-white/10"></div>
 								<a href="/admin" class="block px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/5 active:bg-white/10">Console</a>
 							{/if}
+							<div class="my-1 border-t border-white/10"></div>
+							<a href="/auth/logout" data-sveltekit-reload class="block px-3 py-2 text-sm text-white/70 hover:text-white hover:bg-white/5 active:bg-white/10">Log out</a>
 						</div>
 					</div>
 				</div>
@@ -121,6 +123,8 @@
 				{#if isAdmin}
 					<a href="/admin" class="flex items-center px-3 py-2.5 rounded-md text-sm text-red-400 hover:text-red-300 hover:bg-white/5 active:bg-white/10">Console</a>
 				{/if}
+				<div class="my-1 border-t border-white/10"></div>
+				<a href="/auth/logout" data-sveltekit-reload class="flex items-center px-3 py-2.5 rounded-md text-sm text-white/60 hover:text-white hover:bg-white/5 active:bg-white/10">Log out</a>
 			{/if}
 		</div>
 	{/if}

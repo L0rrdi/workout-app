@@ -518,8 +518,13 @@
 
 {#if showUnsavedModal}
   <div use:portal class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-6">
-    <div class="w-full max-w-sm rounded-md bg-neutral-900 border border-white/10 p-5 space-y-4 shadow-2xl">
-      <div class="space-y-1">
+    <div class="relative w-full max-w-sm rounded-md bg-neutral-900 border border-white/10 p-5 space-y-4 shadow-2xl">
+      <button
+        onclick={stayOnPage} disabled={saving}
+        aria-label="Close"
+        class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded text-lg leading-none disabled:opacity-40"
+      >×</button>
+      <div class="space-y-1 pr-6">
         <p class="text-base font-semibold text-white">Unsaved changes</p>
         <p class="text-sm text-white/50">Do you want to save your changes before leaving?</p>
       </div>
@@ -535,12 +540,6 @@
           class="w-full px-4 py-2 bg-white/5 border border-white/10 text-white/70 rounded-md text-sm font-medium hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Discard changes
-        </button>
-        <button
-          onclick={stayOnPage} disabled={saving}
-          class="w-full px-4 py-2 text-white/40 hover:text-white active:text-white/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 rounded text-sm disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Stay on page
         </button>
       </div>
     </div>
