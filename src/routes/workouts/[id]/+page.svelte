@@ -16,21 +16,6 @@
   let error = $state('');
   let editing = $state(false);
   let saving = $state(false);
-  let templateSaved = $state(false);
-
-  async function saveAsTemplate() {
-    if (!workout) return;
-    await fetch('/api/templates', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: workout.title,
-        exercises: workout.exercises.map(e => ({ name: e.name, sets: e.sets, reps: e.reps, weight: e.weight, unit: e.unit }))
-      })
-    });
-    templateSaved = true;
-    setTimeout(() => { templateSaved = false; }, 2000);
-  }
 
   const TAGS = ['Strength', 'Hypertrophy'];
 
@@ -406,10 +391,10 @@
           </div>
         </div>
         <div class="flex gap-2">
-          <button onclick={saveAsTemplate}
+          <a href="/workouts/{workout.id}/save-template"
             class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
-            {templateSaved ? 'Saved!' : 'Use as template'}
-          </button>
+            Use as template
+          </a>
           <button onclick={startEdit}
             class="px-3 py-1.5 bg-white/5 border border-white/10 text-white/60 rounded-md text-sm hover:bg-white/10 hover:text-white active:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30">
             Edit
