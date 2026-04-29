@@ -58,7 +58,7 @@
         const parsed = JSON.parse(e.set_data);
         if (parsed.cardio) return sum;
         const rows: SetRow[] = parsed;
-        return sum + rows.reduce((s, r) => r.weight !== null ? s + r.reps * r.weight : s, 0);
+        return sum + rows.reduce((s, r) => r.weight !== null && r.reps !== null ? s + r.reps * r.weight : s, 0);
       }
       return e.weight !== null ? sum + e.sets * e.reps * e.weight : sum;
     }, 0);
@@ -127,6 +127,13 @@
     showUnsavedModal = false;
     pendingNav = null;
   }
+
+  // Lock page scroll while the unsaved-changes modal is open
+  $effect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = showUnsavedModal ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  });
 
   // Drag state
   let dragSrcIdx = $state<number | null>(null);

@@ -1,6 +1,7 @@
 <!-- src/routes/progress/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { SvelteMap } from 'svelte/reactivity';
   import { fetchWorkouts } from '$lib/storage';
   import type { Workout, SetRow } from '$lib/storage';
   import {
@@ -73,14 +74,16 @@
     )].sort((a, b) => a.localeCompare(b))
   );
 
-  function periodStart(period: Period): Date | null {
-    const now = new Date();
+  function periodStart(period: Period): number | null {
     if (period === 'all') return null;
-    const d = new Date(now);
-    if (period === 'year')  { d.setFullYear(d.getFullYear() - 1); return d; }
-    if (period === 'month') { d.setDate(d.getDate() - 30); return d; }
-    if (period === 'week')  { d.setDate(d.getDate() - 7); return d; }
-    if (period === 'day')   { d.setHours(0, 0, 0, 0); return d; }
+    const now = Date.now();
+    if (period === 'year')  return now - 365 * 86400000;
+    if (period === 'month') return now - 30 * 86400000;
+    if (period === 'week')  return now - 7 * 86400000;
+    if (period === 'day') {
+      const d = new Date();
+      return now - d.getHours() * 3600000 - d.getMinutes() * 60000 - d.getSeconds() * 1000 - d.getMilliseconds();
+    }
     return null;
   }
 
@@ -90,7 +93,7 @@
       const withWeight = rows.filter(r => r.weight !== null);
       if (withWeight.length === 0) return rows[0]?.reps ?? e.reps;
       const heaviest = withWeight.reduce((a, b) => (b.weight! > a.weight! ? b : a));
-      return heaviest.reps;
+      return heaviest.reps ?? 0;
     }
     return e.reps;
   }
@@ -111,9 +114,9 @@
   const chartData = $derived(() => {
     if (!selectedExercise) return [];
     const start = periodStart(selectedPeriod);
-    const byDate = new Map<string, { date: string; workoutId: string; maxWeight: number | null; maxReps: number; sets: number; unit: string | null }>();
+    const byDate = new SvelteMap<string, { date: string; workoutId: string; maxWeight: number | null; maxReps: number; sets: number; unit: string | null }>();
     filteredWorkouts
-      .filter(w => !start || new Date(w.date + 'T00:00:00') >= start)
+      .filter(w => start === null || new Date(w.date + 'T00:00:00').getTime() >= start)
       .forEach(w => {
         const matches = w.exercises.filter(e => e.name.toLowerCase() === selectedExercise.toLowerCase());
         if (matches.length === 0) return;
@@ -206,10 +209,10 @@
   }
 
   $effect(() => {
-    selectedExercise;
-    selectedPeriod;
-    selectedMetric;
-    canvasEl;
+    void selectedExercise;
+    void selectedPeriod;
+    void selectedMetric;
+    void canvasEl;
     buildChart();
   });
 

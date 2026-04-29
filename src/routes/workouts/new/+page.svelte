@@ -210,6 +210,16 @@
     ]);
     if (tRes.ok) templates = await tRes.json();
     allWorkouts = workouts;
+
+    // Auto-apply a template if ?template=ID is in the URL (used by /templates "Use" button)
+    const params = new URLSearchParams(window.location.search);
+    const requestedTemplateId = params.get('template');
+    if (requestedTemplateId) {
+      const t = templates.find(tt => tt.id === requestedTemplateId);
+      if (t) applyTemplate(t);
+      // Strip the param so a refresh doesn't re-apply
+      window.history.replaceState({}, '', '/workouts/new');
+    }
   });
 
   onDestroy(() => {
