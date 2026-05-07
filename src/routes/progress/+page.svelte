@@ -1,7 +1,6 @@
 <!-- src/routes/progress/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { SvelteMap } from 'svelte/reactivity';
   import { fetchWorkouts } from '$lib/storage';
   import type { Workout, SetRow } from '$lib/storage';
   import {
@@ -89,73 +88,55 @@
     return null;
   }
 
-  function getRepsAtMaxWeight(e: { reps: number; weight: number | null; set_data?: string | null }): number {
-    if (e.set_data) {
-      const rows = JSON.parse(e.set_data) as SetRow[];
-      const withWeight = rows.filter(r => r.weight !== null);
-      if (withWeight.length === 0) return rows[0]?.reps ?? e.reps;
-      const heaviest = withWeight.reduce((a, b) => (b.weight! > a.weight! ? b : a));
-      return heaviest.reps ?? 0;
-    }
-    return e.reps;
-  }
-
-  function getMaxWeight(e: { weight: number | null; set_data?: string | null }): number | null {
-    if (e.set_data) {
-      const rows = JSON.parse(e.set_data) as SetRow[];
-      const weights = rows.map(r => r.weight).filter(w => w !== null) as number[];
-      return weights.length > 0 ? Math.max(...weights) : null;
-    }
-    return e.weight;
-  }
-
-  function getTotalVolume(e: { sets: number; reps: number; weight: number | null; set_data?: string | null }): number {
+  // Returns the per-set rows for an exercise. Falls back to building from
+  // the legacy sets/reps/weight fields when set_data is missing.
+  function getSets(e: { sets: number; reps: number; weight: number | null; set_data?: string | null }): { reps: number; weight: number | null }[] {
     if (e.set_data) {
       const parsed = JSON.parse(e.set_data);
-      if (parsed && parsed.cardio) return 0;
-      const rows = parsed as SetRow[];
-      return rows.reduce((s, r) => r.weight !== null && r.reps !== null ? s + r.weight * r.reps : s, 0);
+      if (parsed && parsed.cardio) return [];
+      if (!Array.isArray(parsed)) return [];
+      return (parsed as SetRow[]).map(r => ({ reps: r.reps ?? 0, weight: r.weight }));
     }
-    return e.weight !== null ? e.sets * e.reps * e.weight : 0;
+    return Array.from({ length: e.sets }, () => ({ reps: e.reps, weight: e.weight }));
   }
 
-  function getTotalReps(e: { sets: number; reps: number; set_data?: string | null }): number {
-    if (e.set_data) {
-      const parsed = JSON.parse(e.set_data);
-      if (parsed && parsed.cardio) return 0;
-      const rows = parsed as SetRow[];
-      return rows.reduce((s, r) => s + (r.reps ?? 0), 0);
-    }
-    return e.sets * e.reps;
-  }
-
-  const totalSets = $derived(() =>
-    chartData().reduce((sum, s) => sum + s.sets, 0)
-  );
+  const totalSets = $derived(() => {
+    const data = chartData();
+    return sortMode === 'all' ? data.length : data.reduce((sum, p) => sum + p.setCount, 0);
+  });
 
   const chartData = $derived(() => {
     if (!selectedExercise) return [];
     const start = periodStart(selectedPeriod);
-    const byDate = new SvelteMap<string, { date: string; workoutId: string; maxWeight: number | null; maxReps: number; totalVolume: number; totalReps: number; sets: number; unit: string | null }>();
+    const points: { date: string; workoutId: string; setIndex: number; setCount: number; weight: number | null; reps: number; unit: string | null }[] = [];
+
     filteredWorkouts
       .filter(w => start === null || new Date(w.date + 'T00:00:00').getTime() >= start)
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
       .forEach(w => {
         const matches = w.exercises.filter(e => e.name.toLowerCase() === selectedExercise.toLowerCase());
-        if (matches.length === 0) return;
-        const best = matches.reduce((a, b) =>
-          (getMaxWeight(b) ?? -1) > (getMaxWeight(a) ?? -1) ? b : a
-        );
-        const maxWeight = getMaxWeight(best);
-        const maxReps = getRepsAtMaxWeight(best);
-        const totalVolume = matches.reduce((s, m) => s + getTotalVolume(m), 0);
-        const totalReps = matches.reduce((s, m) => s + getTotalReps(m), 0);
-        const existing = byDate.get(w.date);
-        const betterThanExisting = !existing || (maxWeight ?? -1) > (existing.maxWeight ?? -1);
-        if (betterThanExisting) {
-          byDate.set(w.date, { date: w.date, workoutId: w.id, maxWeight, maxReps, totalVolume, totalReps, sets: best.sets, unit: best.unit });
-        }
+        matches.forEach(ex => {
+          const sets = getSets(ex);
+          if (sets.length === 0) return;
+          if (sortMode === 'top') {
+            const s = sets[0];
+            points.push({
+              date: w.date, workoutId: w.id, setIndex: 0, setCount: sets.length,
+              weight: s.weight, reps: s.reps, unit: ex.unit
+            });
+          } else {
+            sets.forEach((s, i) => {
+              points.push({
+                date: w.date, workoutId: w.id, setIndex: i, setCount: sets.length,
+                weight: s.weight, reps: s.reps, unit: ex.unit
+              });
+            });
+          }
+        });
       });
-    return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+    return points;
   });
 
   function buildChart() {
@@ -167,11 +148,7 @@
 
     const isWeight = selectedMetric === 'weight';
     const isAll = sortMode === 'all';
-    const yValues = data.map(d =>
-      isAll
-        ? (isWeight ? d.totalVolume : d.totalReps)
-        : (isWeight ? (d.maxWeight ?? 0) : d.maxReps)
-    );
+    const yValues = data.map(d => isWeight ? (d.weight ?? 0) : d.reps);
 
     chart = new Chart(canvasEl, {
       type: 'line',
@@ -211,17 +188,16 @@
             bodyColor: 'rgba(255,255,255,0.5)',
             padding: 10,
             callbacks: {
-              title: (items) => fmt(data[items[0].dataIndex].date),
+              title: (items) => {
+                const d = data[items[0].dataIndex];
+                return fmt(d.date) + (isAll ? ` · Set ${d.setIndex + 1}` : '');
+              },
               label: (item) => {
                 const d = data[item.dataIndex];
-                if (isAll) {
-                  return isWeight
-                    ? `${d.totalVolume.toLocaleString()}${d.unit ?? ''} total`
-                    : `${d.totalReps} reps total`;
+                if (isWeight) {
+                  return d.weight !== null ? `${d.weight}${d.unit ?? ''}` : 'bodyweight';
                 }
-                return isWeight
-                  ? `${d.maxWeight}${d.unit}`
-                  : `${d.maxReps} reps`;
+                return `${d.reps} reps`;
               }
             }
           }
@@ -414,25 +390,22 @@
             <div class="space-y-2">
               <p class="text-xs font-medium text-white/40 uppercase tracking-wide">Recent sessions</p>
               <div class="rounded-md bg-white/5 border border-white/10 divide-y divide-white/5">
-                {#each [...chartData()].reverse().slice(0, 8) as session (session.date)}
+                {#each [...chartData()].reverse().slice(0, 8) as session, i (i)}
                   <a
                     href="/workouts/{session.workoutId}"
                     class="flex items-center justify-between px-4 py-2.5 text-sm hover:bg-white/5 active:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20"
                   >
-                    <span class="text-white/60">{fmt(session.date)}</span>
-                    <span class="text-white font-medium">
+                    <span class="text-white/60">
+                      {fmt(session.date)}
                       {#if sortMode === 'all'}
-                        {#if selectedMetric === 'weight'}
-                          {session.totalVolume.toLocaleString()}{session.unit ?? ''}
-                        {:else}
-                          {session.totalReps} reps
-                        {/if}
+                        <span class="text-white/30 ml-1">· Set {session.setIndex + 1}</span>
+                      {/if}
+                    </span>
+                    <span class="text-white font-medium">
+                      {#if selectedMetric === 'weight'}
+                        {session.weight !== null ? `${session.weight}${session.unit ?? ''}` : 'bw'}
                       {:else}
-                        {#if selectedMetric === 'weight'}
-                          {session.maxWeight}{session.unit}
-                        {:else}
-                          {session.maxReps} reps
-                        {/if}
+                        {session.reps} reps
                       {/if}
                     </span>
                   </a>
