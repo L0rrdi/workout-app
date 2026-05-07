@@ -129,6 +129,8 @@
   });
 
   function setMatchesWeightFilter(s: { weight: number | null }, exUnit: string | null): boolean {
+    // Only filter by weight in reps mode — weight mode shows every set
+    if (selectedMetric !== 'reps') return true;
     if (selectedWeight === 'all') return true;
     if (selectedWeight === 'bw') return s.weight === null;
     const [wStr, uStr] = selectedWeight.split('|');
@@ -266,14 +268,14 @@
     buildChart();
   });
 
-  // Reset the weight filter when the exercise/day/tag scope changes,
-  // so a stale selection doesn't filter the new exercise to nothing.
-  let lastScope = '';
+  // When entering reps mode (or switching exercise within it), make sure
+  // a valid specific weight is selected — the dropdown has no "all" option.
   $effect(() => {
-    const scope = `${selectedExercise}|${selectedDay}|${selectedTag}`;
-    if (scope !== lastScope) {
-      lastScope = scope;
-      selectedWeight = 'all';
+    if (selectedMetric !== 'reps') return;
+    const opts = availableWeights();
+    if (opts.length === 0) return;
+    if (selectedWeight === 'all' || !opts.includes(selectedWeight)) {
+      selectedWeight = opts[0];
     }
   });
 
@@ -382,33 +384,6 @@
             </select>
           </div>
 
-          {#if availableWeights().length > 1}
-            <!-- Weight filter -->
-            <div class="space-y-1.5">
-              <label for="weight-select" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Weight</label>
-              <select
-                id="weight-select"
-                bind:value={selectedWeight}
-                onwheel={(e) => {
-                  const opts = ['all', ...availableWeights()];
-                  if (opts.length === 0) return;
-                  e.preventDefault();
-                  const idx = opts.indexOf(selectedWeight);
-                  const next = e.deltaY > 0
-                    ? Math.min(idx + 1, opts.length - 1)
-                    : Math.max(idx - 1, 0);
-                  if (next !== idx) selectedWeight = opts[next];
-                }}
-                class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-              >
-                <option value="all" class="bg-neutral-900">All weights</option>
-                {#each availableWeights() as w (w)}
-                  <option value={w} class="bg-neutral-900">{weightLabel(w)}</option>
-                {/each}
-              </select>
-            </div>
-          {/if}
-
           <!-- Sort mode toggle -->
           <div class="flex gap-1.5">
             <button
@@ -459,7 +434,28 @@
               <p class="text-sm text-white/40">No data for this exercise in the selected period.</p>
             </div>
           {:else}
-            <div class="rounded-md bg-white/5 border border-white/10 p-4">
+            <div class="relative rounded-md bg-white/5 border border-white/10 p-4">
+              {#if selectedMetric === 'reps' && availableWeights().length > 0}
+                <select
+                  bind:value={selectedWeight}
+                  onwheel={(e) => {
+                    const opts = availableWeights();
+                    if (opts.length === 0) return;
+                    e.preventDefault();
+                    const idx = opts.indexOf(selectedWeight);
+                    if (idx === -1) { selectedWeight = opts[0]; return; }
+                    const next = e.deltaY > 0
+                      ? Math.min(idx + 1, opts.length - 1)
+                      : Math.max(idx - 1, 0);
+                    if (next !== idx) selectedWeight = opts[next];
+                  }}
+                  class="absolute top-2 right-2 z-10 rounded bg-neutral-900 border border-white/15 px-2 py-1 text-xs text-white/70 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/30"
+                >
+                  {#each availableWeights() as w (w)}
+                    <option value={w} class="bg-neutral-900">{weightLabel(w)}</option>
+                  {/each}
+                </select>
+              {/if}
               <canvas bind:this={canvasEl}></canvas>
             </div>
 
