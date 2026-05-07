@@ -20,6 +20,7 @@
   type Period = 'all' | 'year' | 'month' | 'week' | 'day';
   type DayType = 'all' | 'push' | 'pull' | 'legs' | 'other';
   type Metric = 'weight' | 'reps';
+  type SortMode = 'top' | 'all';
 
   const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const fmtShort = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -31,6 +32,7 @@
   let selectedDay = $state<DayType>('all');
   let selectedTag = $state('all');
   let selectedMetric = $state<Metric>('weight');
+  let sortMode = $state<SortMode>('top');
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let chart: Chart | null = null;
 
@@ -107,6 +109,26 @@
     return e.weight;
   }
 
+  function getTotalVolume(e: { sets: number; reps: number; weight: number | null; set_data?: string | null }): number {
+    if (e.set_data) {
+      const parsed = JSON.parse(e.set_data);
+      if (parsed && parsed.cardio) return 0;
+      const rows = parsed as SetRow[];
+      return rows.reduce((s, r) => r.weight !== null && r.reps !== null ? s + r.weight * r.reps : s, 0);
+    }
+    return e.weight !== null ? e.sets * e.reps * e.weight : 0;
+  }
+
+  function getTotalReps(e: { sets: number; reps: number; set_data?: string | null }): number {
+    if (e.set_data) {
+      const parsed = JSON.parse(e.set_data);
+      if (parsed && parsed.cardio) return 0;
+      const rows = parsed as SetRow[];
+      return rows.reduce((s, r) => s + (r.reps ?? 0), 0);
+    }
+    return e.sets * e.reps;
+  }
+
   const totalSets = $derived(() =>
     chartData().reduce((sum, s) => sum + s.sets, 0)
   );
@@ -114,7 +136,7 @@
   const chartData = $derived(() => {
     if (!selectedExercise) return [];
     const start = periodStart(selectedPeriod);
-    const byDate = new SvelteMap<string, { date: string; workoutId: string; maxWeight: number | null; maxReps: number; sets: number; unit: string | null }>();
+    const byDate = new SvelteMap<string, { date: string; workoutId: string; maxWeight: number | null; maxReps: number; totalVolume: number; totalReps: number; sets: number; unit: string | null }>();
     filteredWorkouts
       .filter(w => start === null || new Date(w.date + 'T00:00:00').getTime() >= start)
       .forEach(w => {
@@ -125,10 +147,12 @@
         );
         const maxWeight = getMaxWeight(best);
         const maxReps = getRepsAtMaxWeight(best);
+        const totalVolume = matches.reduce((s, m) => s + getTotalVolume(m), 0);
+        const totalReps = matches.reduce((s, m) => s + getTotalReps(m), 0);
         const existing = byDate.get(w.date);
         const betterThanExisting = !existing || (maxWeight ?? -1) > (existing.maxWeight ?? -1);
         if (betterThanExisting) {
-          byDate.set(w.date, { date: w.date, workoutId: w.id, maxWeight, maxReps, sets: best.sets, unit: best.unit });
+          byDate.set(w.date, { date: w.date, workoutId: w.id, maxWeight, maxReps, totalVolume, totalReps, sets: best.sets, unit: best.unit });
         }
       });
     return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
@@ -142,7 +166,12 @@
     if (data.length === 0) return;
 
     const isWeight = selectedMetric === 'weight';
-    const yValues = data.map(d => isWeight ? (d.maxWeight ?? 0) : d.maxReps);
+    const isAll = sortMode === 'all';
+    const yValues = data.map(d =>
+      isAll
+        ? (isWeight ? d.totalVolume : d.totalReps)
+        : (isWeight ? (d.maxWeight ?? 0) : d.maxReps)
+    );
 
     chart = new Chart(canvasEl, {
       type: 'line',
@@ -185,6 +214,11 @@
               title: (items) => fmt(data[items[0].dataIndex].date),
               label: (item) => {
                 const d = data[item.dataIndex];
+                if (isAll) {
+                  return isWeight
+                    ? `${d.totalVolume.toLocaleString()}${d.unit ?? ''} total`
+                    : `${d.totalReps} reps total`;
+                }
                 return isWeight
                   ? `${d.maxWeight}${d.unit}`
                   : `${d.maxReps} reps`;
@@ -212,6 +246,7 @@
     void selectedExercise;
     void selectedPeriod;
     void selectedMetric;
+    void sortMode;
     void canvasEl;
     buildChart();
   });
@@ -321,6 +356,20 @@
             </select>
           </div>
 
+          <!-- Sort mode toggle -->
+          <div class="flex gap-1.5">
+            <button
+              onclick={() => sortMode = 'top'}
+              class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                {sortMode === 'top' ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+            >Top set</button>
+            <button
+              onclick={() => sortMode = 'all'}
+              class="px-3 py-1.5 rounded text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30
+                {sortMode === 'all' ? 'bg-white text-neutral-950' : 'bg-white/5 text-white/50 hover:bg-white/10 hover:text-white active:bg-white/5'}"
+            >All sets</button>
+          </div>
+
           <!-- Metric toggle -->
           <div class="flex gap-1.5">
             <button
@@ -372,10 +421,18 @@
                   >
                     <span class="text-white/60">{fmt(session.date)}</span>
                     <span class="text-white font-medium">
-                      {#if selectedMetric === 'weight'}
-                        {session.maxWeight}{session.unit}
+                      {#if sortMode === 'all'}
+                        {#if selectedMetric === 'weight'}
+                          {session.totalVolume.toLocaleString()}{session.unit ?? ''}
+                        {:else}
+                          {session.totalReps} reps
+                        {/if}
                       {:else}
-                        {session.maxReps} reps
+                        {#if selectedMetric === 'weight'}
+                          {session.maxWeight}{session.unit}
+                        {:else}
+                          {session.maxReps} reps
+                        {/if}
                       {/if}
                     </span>
                   </a>
