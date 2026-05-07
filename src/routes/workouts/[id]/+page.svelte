@@ -38,7 +38,7 @@
   let editExercises = $state<EditExercise[]>([]);
   let nextKey = 0;
 
-  // Unique exercise names for the autocomplete datalist (skips cardio).
+  // Unique exercise names for the autocomplete dropdown (skips cardio).
   const exerciseNameSuggestions = $derived(() => {
     const names = new SvelteSet<string>();
     for (const w of allWorkouts) {
@@ -55,6 +55,17 @@
     }
     return [...names].sort((a, b) => a.localeCompare(b));
   });
+
+  const SUGGESTION_LIMIT = 6;
+  let activeNameKey = $state<string | null>(null);
+
+  function suggestionsFor(query: string): string[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return exerciseNameSuggestions()
+      .filter(n => n.toLowerCase() !== q && n.toLowerCase().startsWith(q))
+      .slice(0, SUGGESTION_LIMIT);
+  }
 
   const prMap = $derived(() => {
     const map = new SvelteMap<string, number>();
@@ -375,11 +386,30 @@
                   aria-label="Drag to reorder"
                   ontouchstart={() => onTouchStart(exIdx)}
                 >⠿</button>
-                <div class="flex-1 space-y-1">
+                <div class="flex-1 space-y-1 relative">
                   <label for="edit-name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Name</label>
                   <input id="edit-name-{exercise._key}" type="text" bind:value={exercise.name}
-                    list="exercise-names"
+                    autocomplete="off"
+                    onfocus={() => activeNameKey = `ex-${exercise._key}`}
+                    oninput={() => activeNameKey = `ex-${exercise._key}`}
+                    onblur={() => { if (activeNameKey === `ex-${exercise._key}`) activeNameKey = null; }}
                     class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
+                  {#if activeNameKey === `ex-${exercise._key}`}
+                    {@const suggestions = suggestionsFor(exercise.name)}
+                    {#if suggestions.length > 0}
+                      <ul class="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-md bg-neutral-900 border border-white/10 shadow-lg divide-y divide-white/5">
+                        {#each suggestions as name (name)}
+                          <li>
+                            <button
+                              type="button"
+                              onmousedown={(e) => { e.preventDefault(); exercise.name = name; activeNameKey = null; }}
+                              class="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:bg-white/10"
+                            >{name}</button>
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  {/if}
                 </div>
                 <div class="space-y-1">
                   <label for="edit-unit-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Unit</label>
@@ -564,9 +594,3 @@
     </div>
   </div>
 {/if}
-
-<datalist id="exercise-names">
-  {#each exerciseNameSuggestions() as name (name)}
-    <option value={name}></option>
-  {/each}
-</datalist>
