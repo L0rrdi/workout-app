@@ -257,18 +257,19 @@
     return null;
   }
 
-  function getLastReps(exerciseName: string, weight: number | null): number | null {
+  function getLastReps(exerciseName: string, setIndex: number): number | null {
     const ex = findLastExercise(exerciseName);
     if (!ex) return null;
     if (ex.set_data) {
       try {
         const rows = JSON.parse(ex.set_data);
         if (!Array.isArray(rows)) return null;
-        const match = (rows as SetRow[]).find(r => r.weight === weight);
-        return match !== undefined ? match.reps : null;
+        const row = (rows as SetRow[])[setIndex];
+        return row?.reps ?? null;
       } catch { return null; }
     }
-    return ex.weight === weight ? ex.reps : null;
+    // Old format had a single reps applied to all sets
+    return ex.reps ?? null;
   }
 
   function applyTemplate(t: Template) {
@@ -703,8 +704,8 @@
                         onkeydown={noExpNoDot}
                         class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
                       />
-                      {#if getLastReps(exercise.name, row.weight) !== null}
-                        <p class="text-[10px] text-white/25 pl-1">{getLastReps(exercise.name, row.weight)} last</p>
+                      {#if getLastReps(exercise.name, i) !== null}
+                        <p class="text-[10px] text-white/25 pl-1">{getLastReps(exercise.name, i)} last</p>
                       {/if}
                     </div>
                     <div class="space-y-0.5">
