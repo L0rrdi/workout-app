@@ -6,7 +6,7 @@
   import type { WeightUnit } from '$lib/parser';
   import { page } from '$app/state';
   import { beforeNavigate, goto } from '$app/navigation';
-  import { SvelteMap } from 'svelte/reactivity';
+  import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
   const id = page.params.id;
   const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -37,6 +37,24 @@
   let editTag = $state<string | null>(null);
   let editExercises = $state<EditExercise[]>([]);
   let nextKey = 0;
+
+  // Unique exercise names for the autocomplete datalist (skips cardio).
+  const exerciseNameSuggestions = $derived(() => {
+    const names = new SvelteSet<string>();
+    for (const w of allWorkouts) {
+      for (const e of w.exercises) {
+        if (e.set_data) {
+          try {
+            const parsed = JSON.parse(e.set_data);
+            if (parsed && parsed.cardio) continue;
+          } catch { /* ignore */ }
+        }
+        const trimmed = e.name.trim();
+        if (trimmed) names.add(trimmed);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  });
 
   const prMap = $derived(() => {
     const map = new SvelteMap<string, number>();
@@ -360,6 +378,7 @@
                 <div class="flex-1 space-y-1">
                   <label for="edit-name-{exercise._key}" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Name</label>
                   <input id="edit-name-{exercise._key}" type="text" bind:value={exercise.name}
+                    list="exercise-names"
                     class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20" />
                 </div>
                 <div class="space-y-1">
@@ -545,3 +564,9 @@
     </div>
   </div>
 {/if}
+
+<datalist id="exercise-names">
+  {#each exerciseNameSuggestions() as name (name)}
+    <option value={name}></option>
+  {/each}
+</datalist>

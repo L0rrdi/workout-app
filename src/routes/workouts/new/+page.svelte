@@ -1,6 +1,7 @@
 <!-- src/routes/workouts/new/+page.svelte -->
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { createWorkout, generateId, fetchWorkouts } from '$lib/storage';
   import type { SetRow, Workout } from '$lib/storage';
   import type { WeightUnit } from '$lib/parser';
@@ -227,6 +228,25 @@
     if (touchEndHandler) document.removeEventListener('touchend', touchEndHandler);
   });
 
+  // Unique exercise names from previous workouts, used for the autocomplete
+  // datalist on the exercise-name inputs. Skips cardio entries.
+  const exerciseNameSuggestions = $derived(() => {
+    const names = new SvelteSet<string>();
+    for (const w of allWorkouts) {
+      for (const e of w.exercises) {
+        if (e.set_data) {
+          try {
+            const parsed = JSON.parse(e.set_data);
+            if (parsed && parsed.cardio) continue;
+          } catch { /* ignore */ }
+        }
+        const trimmed = e.name.trim();
+        if (trimmed) names.add(trimmed);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  });
+
   function findLastExercise(exerciseName: string) {
     const name = exerciseName.trim().toLowerCase();
     if (!name) return null;
@@ -421,6 +441,7 @@
                     <input
                       type="text" bind:value={ex.name}
                       placeholder="Exercise"
+                      list="exercise-names"
                       class="rounded bg-white/5 border border-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
                     />
                     <input
@@ -666,6 +687,7 @@
                   <input
                     id="name-{exercise._key}" type="text" bind:value={exercise.name}
                     placeholder="e.g. Bench Press"
+                    list="exercise-names"
                     class="w-full rounded bg-white/5 border border-white/10 px-3 py-1.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-white/20"
                   />
                 </div>
@@ -766,3 +788,9 @@
     </div>
   </div>
 </div>
+
+<datalist id="exercise-names">
+  {#each exerciseNameSuggestions() as name (name)}
+    <option value={name}></option>
+  {/each}
+</datalist>
