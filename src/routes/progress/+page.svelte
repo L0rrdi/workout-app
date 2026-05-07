@@ -1,6 +1,7 @@
 <!-- src/routes/progress/+page.svelte -->
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { fetchWorkouts } from '$lib/storage';
   import type { Workout, SetRow } from '$lib/storage';
   import {
@@ -32,6 +33,7 @@
   let selectedTag = $state('all');
   let selectedMetric = $state<Metric>('weight');
   let sortMode = $state<SortMode>('top');
+  let selectedWeight = $state<string>('all'); // 'all', 'bw', or `${weight}|${unit}`
   let canvasEl = $state<HTMLCanvasElement | null>(null);
   let chart: Chart | null = null;
 
@@ -105,6 +107,40 @@
     return sortMode === 'all' ? data.length : data.reduce((sum, p) => sum + p.setCount, 0);
   });
 
+  // Unique weights ever used for the selected exercise (within the
+  // current Day/Tag filters). Used to populate the weight-filter dropdown.
+  const availableWeights = $derived(() => {
+    if (!selectedExercise) return [] as string[];
+    const set = new SvelteSet<string>();
+    filteredWorkouts.forEach(w => {
+      w.exercises
+        .filter(e => e.name.toLowerCase() === selectedExercise.toLowerCase())
+        .forEach(ex => {
+          getSets(ex).forEach(s => {
+            set.add(s.weight === null ? 'bw' : `${s.weight}|${ex.unit ?? 'kg'}`);
+          });
+        });
+    });
+    return [...set].sort((a, b) => {
+      if (a === 'bw') return 1;
+      if (b === 'bw') return -1;
+      return parseFloat(b) - parseFloat(a);
+    });
+  });
+
+  function setMatchesWeightFilter(s: { weight: number | null }, exUnit: string | null): boolean {
+    if (selectedWeight === 'all') return true;
+    if (selectedWeight === 'bw') return s.weight === null;
+    const [wStr, uStr] = selectedWeight.split('|');
+    return s.weight === parseFloat(wStr) && (exUnit ?? 'kg') === uStr;
+  }
+
+  function weightLabel(key: string): string {
+    if (key === 'bw') return 'Bodyweight';
+    const [w, u] = key.split('|');
+    return `${w} ${u}`;
+  }
+
   const chartData = $derived(() => {
     if (!selectedExercise) return [];
     const start = periodStart(selectedPeriod);
@@ -121,12 +157,14 @@
           if (sets.length === 0) return;
           if (sortMode === 'top') {
             const s = sets[0];
+            if (!setMatchesWeightFilter(s, ex.unit)) return;
             points.push({
               date: w.date, workoutId: w.id, setIndex: 0, setCount: sets.length,
               weight: s.weight, reps: s.reps, unit: ex.unit
             });
           } else {
             sets.forEach((s, i) => {
+              if (!setMatchesWeightFilter(s, ex.unit)) return;
               points.push({
                 date: w.date, workoutId: w.id, setIndex: i, setCount: sets.length,
                 weight: s.weight, reps: s.reps, unit: ex.unit
@@ -223,8 +261,20 @@
     void selectedPeriod;
     void selectedMetric;
     void sortMode;
+    void selectedWeight;
     void canvasEl;
     buildChart();
+  });
+
+  // Reset the weight filter when the exercise/day/tag scope changes,
+  // so a stale selection doesn't filter the new exercise to nothing.
+  let lastScope = '';
+  $effect(() => {
+    const scope = `${selectedExercise}|${selectedDay}|${selectedTag}`;
+    if (scope !== lastScope) {
+      lastScope = scope;
+      selectedWeight = 'all';
+    }
   });
 
   onMount(async () => {
@@ -331,6 +381,33 @@
               {/each}
             </select>
           </div>
+
+          {#if availableWeights().length > 1}
+            <!-- Weight filter -->
+            <div class="space-y-1.5">
+              <label for="weight-select" class="block text-xs font-medium text-white/40 uppercase tracking-wide">Weight</label>
+              <select
+                id="weight-select"
+                bind:value={selectedWeight}
+                onwheel={(e) => {
+                  const opts = ['all', ...availableWeights()];
+                  if (opts.length === 0) return;
+                  e.preventDefault();
+                  const idx = opts.indexOf(selectedWeight);
+                  const next = e.deltaY > 0
+                    ? Math.min(idx + 1, opts.length - 1)
+                    : Math.max(idx - 1, 0);
+                  if (next !== idx) selectedWeight = opts[next];
+                }}
+                class="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/20"
+              >
+                <option value="all" class="bg-neutral-900">All weights</option>
+                {#each availableWeights() as w (w)}
+                  <option value={w} class="bg-neutral-900">{weightLabel(w)}</option>
+                {/each}
+              </select>
+            </div>
+          {/if}
 
           <!-- Sort mode toggle -->
           <div class="flex gap-1.5">
