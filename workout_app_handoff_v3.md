@@ -1,4 +1,4 @@
-# Workout App Handoff (v9)
+# Workout App Handoff (v10)
 ## Who I am
 I am a beginner building my first full-stack web app. I need step-by-step guidance, including exact commands to run in PowerShell.
 
@@ -122,9 +122,9 @@ All of the following is complete and working:
 - `DELETE /api/workouts/[id]` — verifies ownership, deletes exercises first, then workout
 - `DELETE /api/workouts` — deletes ALL workouts for the user (used by Settings page)
 - `POST /api/workouts/bulk` — bulk insert with `user_id`, supports `tag` and `set_data`. Rejects requests with > 500 workouts (returns 400)
-- `GET /api/templates` — fetch all templates for user
-- `POST /api/templates` — save new template `{ title, exercises }`
-- `PUT /api/templates?id=xxx` — update template title + exercises
+- `GET /api/templates` — fetch all templates for user (returns `{ id, title, tag, exercises }[]`)
+- `POST /api/templates` — save new template `{ title, tag, exercises }`
+- `PUT /api/templates?id=xxx` — update template title, tag, exercises
 - `DELETE /api/templates?id=xxx` — delete a template
 - `DELETE /api/admin/users/[id]` — admin only: deletes user + all their data
 
@@ -133,11 +133,13 @@ All of the following is complete and working:
 - `/` — home page. Title "Workout tracking". Shows workout count + streak (2+ days). "+ New workout" button → /workouts/new. "View workouts" button → /workouts
 - `/import` — textarea, parse button, editable preview, save to database. Has "Bulk import" link top-right
 - `/import/bulk` — 3-step flow: copy AI prompt → paste JSON → set date range → preview → import. Prompt instructs the AI to output max 500 workouts and append `// CONTINUED` if truncated so user can do multiple batches
-- `/workouts` — lists all workouts. Tag badge shown next to workout title. Day filter (All/Push/Pull/Legs/Other), search by title or exercise, relative dates (Today/Yesterday/N days ago), weekly volume summary, confirm-before-delete. Import + New buttons top-right
-- `/workouts/new` — form-based workout entry: title, date, notes, tag picker, exercises with per-set reps+weight rows. Shows "X last" hint below each reps/weight input (matches by exercise name+weight, prefers same tag). Templates picker button top-right if templates exist. Cardio form shown when Cardio tag selected. Auto-saves draft to localStorage every 3s; "Draft" badge + "Discard draft" button shown when draft exists; draft cleared on successful save. Exercises can be drag-reordered via ⠿ handle (HTML5 DnD on desktop, touch events on mobile)
-- `/workouts/[id]` — detail page. Tag badge shown next to date. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. Per-set display if set_data exists. Cardio display (distance/time/pace) for Cardio tag. "Use as template" button + Edit button. Admin can view any user's workout. Edit mode supports exercise drag-reorder via ⠿ handle (same implementation as /workouts/new)
-- `/progress` — Chart.js line graph. Weight/Reps metric toggle. Clicking a dot navigates to that workout. Filter by Day type, Tag (shown when tagged workouts exist), exercise dropdown, period tabs (All/Year/Month/Week/Day). Total sets counter. Recent sessions list. Reps mode shows reps at heaviest set
-- `/profile` — shows Google avatar, name, email, date joined. Admin badge (red) for nosviland@gmail.com. Sign out button
+- `/workouts` — lists all workouts. Tag badge shown next to workout title. Workouts with notes get a small "!" badge popping out of the card's top-right corner (neutral theme, links to detail page). Day filter (All/Push/Pull/Legs/Other), search by title or exercise, relative dates (Today/Yesterday/N days ago), weekly volume summary, confirm-before-delete. Templates + New buttons top-right (Import is now in the avatar dropdown)
+- `/workouts/new` — form-based workout entry: title, date, notes, tag picker, exercises with per-set reps+weight rows. Custom autocomplete dropdown on every exercise-name input — hidden when empty, filters by case-insensitive `startsWith` against past names, capped at 6 results. Shows "X last" hint below each reps/weight input (reps now matches by **set index**, weight matches by set index; both prefer same tag). Templates picker button top-right if templates exist (hidden when Cardio tag selected); supports `?template=ID` query param to auto-apply on load. Cardio form shown when Cardio tag selected. Draft auto-saves on every change via `$effect`; "Draft" badge + "Discard draft" button shown when draft exists; draft cleared on successful save. Exercises can be drag-reordered via ⠿ handle (HTML5 DnD on desktop, touch events on mobile)
+- `/workouts/[id]` — detail page. Tag badge shown next to date. Shows PR badge (amber) on all-time best weight exercises. Shows total volume. Notes section. Per-set display if set_data exists. Cardio display (distance/time/pace) for Cardio tag. "Use as template" button → `/workouts/[id]/save-template`. Edit button. Admin can view any user's workout. Edit mode supports exercise drag-reorder via ⠿ handle and same autocomplete dropdown as `/workouts/new`. Leaving edit mode with unsaved changes triggers a portal'd modal (Save & leave / Discard changes / × close) that locks body scroll
+- `/workouts/[id]/save-template` — dedicated page for saving the workout's exercises as a template. Two options: **Save as new template** (editable title) or **Overwrite an existing template** (lists all user's templates with tag badges; each has a two-step Confirm overwrite button). Uses the workout's tag, blanks out reps and weight when saving
+- `/templates` — manage templates. Lists all user templates with tag badges and exercise counts. Each row has Use / Edit (inline form with TAGS picker + grid of name/sets/reps/weight/unit) / Delete (two-step confirm). Use links to `/workouts/new?template=ID`
+- `/progress` — Chart.js line graph. Filters: Day type, Tag (when tagged workouts exist), Exercise dropdown (mouse-wheel-cycle while hovered, blocks page scroll), period tabs (All/Year/Month/Week/Day). **Top set / All sets toggle** (Top set = first set per workout, default; All sets = each individual set as its own data point). Weight / Reps metric toggle. **Weight dropdown floats over the chart's top-right corner — only when metric is "Reps"** — auto-selects the heaviest weight, scroll-wheel cycles options. Total-sets counter. Recent-sessions list. Clicking a dot navigates to that workout
+- `/profile` — shows Google avatar, name, email, date joined. Admin badge (red) when user matches `ADMIN_EMAIL`. Sign out button
 - `/records` — personal records page. All-time best weight per exercise, alphabetically sorted, searchable. Tag filter buttons (All / Strength / Hypertrophy / Cardio) appear when tagged workouts exist — filters PRs to only those achieved in workouts of that tag. Each row links to the workout where the PR was set
 - `/settings` — Delete all workouts button with inline confirm prompt
 - `/admin` — admin-only console. Stats (users/workouts/exercises), top exercises chart, full user table with workout counts. Each user row links to drill-down. Accessible via avatar dropdown (Console link, red, admin only)
@@ -145,11 +147,12 @@ All of the following is complete and working:
 
 ### Layout & Nav
 - `src/routes/+layout.svelte` — fixed top nav, dark themed. Hidden on /login
-- **Desktop**: Workouts | Progress | Import | + New | avatar dropdown
+- **Desktop**: Workouts | Progress | + New | avatar dropdown (Import is in the dropdown, not the main nav)
 - **Mobile**: hamburger button (animates to X) → slide-down menu with all links + profile section
-- Avatar dropdown (hover, desktop only): Profile | Records | Settings | Console (admin only, red)
-- Active nav: Workouts on `/workouts*`, Progress on `/progress*`, Import filled-white on `/import`, + New filled-white on `/workouts/new`
-- Page fade-in animation via `.page-fade` class in `layout.css`
+- Avatar dropdown (hover, desktop only): Profile | Records | Import | Settings | Console (admin only, red, after divider) | Log out (after divider)
+- Active nav: Workouts on `/workouts*`, Progress on `/progress*`, + New filled-white on `/workouts/new`
+- Log out link uses `data-sveltekit-reload` so the server endpoint actually runs
+- Page fade-in animation via `.page-fade` class in `layout.css` — IMPORTANT: this class applies a `transform`, which makes any descendant `position: fixed` element position relative to it instead of the viewport. Modals must portal to `document.body` (see "Modals & portals" below)
 - `html, body { background-color: #0a0a0a }` in `layout.css` — prevents white overscroll on mobile
 
 ### Workout tags
@@ -170,33 +173,61 @@ All of the following is complete and working:
 
 ### Last workout reference (on /workouts/new)
 - When typing an exercise name, each set shows faint hints below the inputs:
-  - `X last` below the reps input — reps at matching weight from last workout
-  - `Xkg last` below the weight input — weight at matching set index from last workout
+  - `X last` below the reps input — reps at the **same set index** from last workout (e.g. set 2 hint shows previous set 2's reps)
+  - `Xkg last` below the weight input — weight at the same set index from last workout
 - Matching: prefers workouts with same tag, falls back to any workout if none found
 - Skips cardio exercises (non-array set_data)
+
+### Exercise-name autocomplete (on /workouts/new and /workouts/[id] edit)
+- Custom dropdown (replaces native datalist) on every exercise-name input
+- Stays hidden when the input is empty; opens on focus + every keystroke
+- Filters previous exercise names by case-insensitive `startsWith`, hides exact matches, capped at 6 results, max-height 56 (scrollable)
+- Suggestions come from `allWorkouts` (already loaded for PR map / "X last" hints) — unique non-cardio names, alphabetised
+- Uses `onmousedown` + `e.preventDefault()` on suggestion buttons so clicking a suggestion doesn't blur the input first
+- Shared `activeNameKey` state with namespaced keys (`ex-{key}` vs `tpl-{i}`) so the main exercise list and inline template editor don't collide
 
 ### Per-set exercise data
 - Each exercise can store per-set reps + weight via `set_data TEXT` column (JSON array of `{reps, weight}`)
 - `sets` = number of set rows, `weight` = max weight across sets (used for PR tracking)
+- `SetRow` interface in `storage.ts`: `{ reps: number | null; weight: number | null }` — both nullable so blank inputs are possible (used by templates)
 - Old exercises without `set_data` still display correctly using `sets × reps · weight`
 - New workout form and edit mode both show individual set rows with "+ Add set" / remove buttons
 
 ### Workout templates
-- Stored in `templates` table: `(id, user_id, title, exercises JSON, created_at)`
-- Template exercises shape: `{ name, sets, reps, weight: number | null, unit: string | null }[]`
-- "Use as template" button on `/workouts/[id]` — saves current workout's title + exercises as a template
-- On `/workouts/new` — "Templates" button appears if templates exist (hidden when Cardio tag selected)
-- Template list shows: Use, Edit, Delete buttons per template
-- Edit opens an inline form (title + per-exercise name/sets/reps/weight/unit) — saves via `PUT /api/templates?id=`
-- Applying a template fills in the title and exercises instantly
+- Stored in `templates` table: `(id, user_id, title, tag, exercises JSON, created_at)`
+- Template exercises shape: `{ name, sets, reps: number | null, weight: number | null, unit: string | null }[]` — reps/weight are nullable and saved as `null` so applying produces blank inputs
+- "Use as template" button on `/workouts/[id]` → `/workouts/[id]/save-template` page (separate flow, not an inline POST)
+- Save-template page has two paths: **Save as new template** (editable title) or **Overwrite an existing template** (lists all templates with tag badges, two-step Confirm overwrite)
+- Save-template captures the workout's tag and blanks reps/weight before sending
+- On `/workouts/new` — "Templates" picker button appears if templates exist (hidden when Cardio tag selected)
+- Picker rows show: title + tag badge, Use, Edit, two-step Confirm-delete
+- Inline edit form has TAGS chips (Strength/Hypertrophy/Cardio) and grid of name/sets/reps/weight/unit
+- Applying a template: fills title, **resets date to today**, sets tag, replaces exercises (reps/weight blank if saved that way)
+- Dedicated `/templates` page for management (Use/Edit/Delete) — linked from "Templates" button on `/workouts`
+- `?template=ID` on `/workouts/new` auto-applies that template on load and strips the param via `history.replaceState`
+- **Migration 0010** nulled out reps/weight on every template that existed before the blanking change
 
 ### Draft auto-save (on /workouts/new)
-- Form state saved to localStorage key `workout_draft` every 3 seconds
+- Form state saved to localStorage key `workout_draft` **on every state change** via `$effect` — no setInterval. The effect calls `JSON.stringify(...)` on every draft field to track them all (including deep mutations into `exercises[]`)
+- A `draftReady` flag set in `onMount` after `loadDraft()` prevents the initial render from clobbering an existing draft
 - On page load: draft is restored automatically if one exists
 - "Draft" pill badge shown in header when a draft is active
 - "Discard draft" button resets the form to defaults and clears localStorage
 - Draft is removed from localStorage on successful workout save
 - Max 1 draft at a time (always overwrites the previous)
+
+### Modals & portals
+- The `.page-fade` wrapper applies a `transform`, which traps `position: fixed` descendants. Any modal that needs to cover the viewport (not the page) must portal to `document.body`
+- `use:portal` action used on `/workouts/[id]` unsaved-changes modal: `{ destroy: () => node.remove() }`
+- Body scroll lock pattern: `$effect(() => { document.body.style.overflow = open ? 'hidden' : ''; return () => { document.body.style.overflow = ''; }; })`
+
+### Unsaved-changes prompt (on /workouts/[id] edit mode)
+- Snapshot taken via `JSON.stringify(...)` when entering edit mode
+- `beforeNavigate` from `$app/navigation` cancels the navigation if `editing && snapshot !== current`
+- Modal options: **Save & leave** / **Discard changes** / **× close (top-right)**
+- Body scroll locked while open; modal portal'd to `document.body`
+- `allowNavigation` flag bypasses the guard once the user picks Save or Discard, then `goto(pendingNav)`
+- No prompt on `/workouts/new` (drafts handle that) and no prompt when there are no changes
 
 ### Exercise drag-reorder
 - Available on `/workouts/new` and `/workouts/[id]` (edit mode)
@@ -206,11 +237,24 @@ All of the following is complete and working:
 - Visual feedback: dragged card is dimmed (opacity-50), drop target gets a brighter border
 - Touch handlers are registered in `onMount` and cleaned up in `onDestroy`
 
-### Mobile numeric keyboard
+### Mobile numeric keyboard + desktop key blocking
 - All `type="number"` inputs use `inputmode` to show the correct mobile keyboard:
   - `inputmode="numeric"` — reps, sets, minutes, seconds (integer fields)
   - `inputmode="decimal"` — weight, distance (decimal fields)
-- Applied on `/workouts/new` and `/workouts/[id]`
+- Applied on `/workouts/new`, `/workouts/[id]`, and `/templates` inline editor
+- Desktop `onkeydown` blocks `e`, `E`, `+`, `-` on every number input. Integer-only fields also block `.` (helpers `noExp` and `noExpNoDot`)
+
+### Progress page details
+- Chart points are per-set (or per-workout in Top set mode):
+  - **Top set**: one point per workout = set 1 of the matching exercise(s) on that day
+  - **All sets**: one point per individual set across every workout
+- `chartData` returns a flat `{ date, workoutId, setIndex, setCount, weight, reps, unit }[]`
+- Tooltip: `fmt(date) · Set N` in All-sets mode; just `fmt(date)` in Top-set
+- Recent-sessions list mirrors mode: in All sets each row shows `· Set N`
+- Total-sets counter: in Top mode sums `setCount` across points; in All mode just uses `points.length`
+- Weight filter (only in Reps metric): unique weight + unit combos for the selected exercise. Stored as `${weight}|${unit}` or `bw`. Filter only applies when `selectedMetric === 'reps'`. A `$effect` ensures a valid weight is selected when entering reps mode
+- `periodStart()` returns a `number | null` (timestamp) and avoids Date mutation; consumer uses `.getTime() >= start`
+- `chartData` uses `SvelteMap`; `availableWeights` uses `SvelteSet` (eslint `prefer-svelte-reactivity`)
 
 ### Database
 - Cloudflare D1, database name: `workout-app-db`
@@ -221,8 +265,10 @@ All of the following is complete and working:
   - `sessions (id, user_id, expires_at)`
   - `api_tokens (id, user_id UNIQUE, token UNIQUE, created_at)`
   - `templates (id, user_id, title, exercises TEXT, created_at)`
-- Migrations: `0001` through `0008` all applied locally and remotely
+- Migrations: `0001` through `0010` all applied locally and remotely
   - `0008_add_workout_tag.sql` — adds `tag TEXT` to workouts
+  - `0009_add_template_tag.sql` — adds `tag TEXT` to templates
+  - `0010_blank_template_reps_weight.sql` — one-time data migration that nulled reps/weight on every existing template (uses SQLite `json_each` + `json_object`)
 
 ### Secrets (Cloudflare Workers env vars)
 - `GOOGLE_CLIENT_ID` — Google OAuth client ID
@@ -312,12 +358,17 @@ src/
       +page.svelte
     settings/
       +page.svelte
+    templates/
+      +page.svelte
     workouts/
       +page.svelte
       new/
         +page.svelte
       [id]/
         +page.svelte
+        save-template/
+          +page.svelte
+          +page.server.ts
     progress/
       +page.svelte
 migrations/
@@ -329,6 +380,8 @@ migrations/
   0006_add_templates.sql
   0007_add_set_data.sql
   0008_add_workout_tag.sql
+  0009_add_template_tag.sql
+  0010_blank_template_reps_weight.sql
 wrangler.json
 svelte.config.js
 frontend_rules.md
