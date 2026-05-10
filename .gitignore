@@ -22,3 +22,6 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Internal handoff doc (kept locally, not pushed)
+workout_app_handoff_v3.md
